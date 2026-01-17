@@ -1,14 +1,23 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { StateMachine } from '@/lib/state-machine/state-machine';
 import type { StateMachineConfig } from '@/lib/state-machine/types';
 import StateMachineDiagram from '@/components/StateMachineDiagram';
 import CodeEditor from '@/components/CodeEditor';
 import StateDisplay from '@/components/StateDisplay';
 import EventControls from '@/components/EventControls';
+import EventLog, { type EventLogEntry } from '@/components/EventLog';
+import Toast from '@/components/Toast';
 import { examples } from '@/examples';
 import { useTheme } from '@/contexts/ThemeContext';
 
-type Tab = 'editor' | 'diagram';
+type Tab = 'controls' | 'editor' | 'diagram';
+
+interface MachineSnapshot {
+  stateValue: any;
+  context: any;
+  eventLog: EventLogEntry[];
+  eventSeq: number;
+}
 
 function App() {
   const { theme, toggleTheme } = useTheme();
@@ -17,7 +26,28 @@ function App() {
   const [config, setConfig] = useState<StateMachineConfig<any, any> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeStates, setActiveStates] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<Tab>('editor');
+  const [activeTab, setActiveTab] = useState<Tab>('controls');
+  const [eventLog, setEventLog] = useState<EventLogEntry[]>([]);
+  const [eventSeq, setEventSeq] = useState(0);
+  const [history, setHistory] = useState<MachineSnapshot[]>([]);
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
+  const [initialized, setInitialized] = useState(false);
+
+  // Auto-load counter example on first mount
+  useEffect(() => {
+    if (!initialized) {
+      try {
+        const loadedConfig = eval(examples.counter);
+        const newMachine = new StateMachine(loadedConfig).start();
+        setMachine(newMachine);
+        setConfig(loadedConfig);
+        setActiveStates(new Set(newMachine.getActiveStateNodes()));
+        setInitialized(true);
+      } catch (err) {
+        console.error('Failed to auto-load counter example:', err);
+      }
+    }
+  }, [initialized]);
 
   // Extract available events from config
   const availableEvents = useMemo(() => {
@@ -71,6 +101,9 @@ function App() {
       setConfig(loadedConfig);
       setActiveStates(new Set(newMachine.getActiveStateNodes()));
       setError(null);
+      setEventLog([]);
+      setEventSeq(0);
+      setHistory([]);
     } catch (err: any) {
       setError(err.message || 'Failed to load configuration');
       setMachine(null);
@@ -78,28 +111,115 @@ function App() {
     }
   }, [code]);
 
+  // Detect when machine halts and show toast
+  useEffect(() => {
+    if (machine && machine.isHalted()) {
+      setToast({ message: 'State Machine Halted', type: 'warning' });
+    }
+  }, [machine, activeStates]);
+
   const handleSendEvent = useCallback((eventType: string, payload?: any) => {
     if (!machine) return;
 
     try {
+      // Save current state to history before making changes
+      const snapshot: MachineSnapshot = {
+        stateValue: machine.getStateValue(),
+        context: JSON.parse(JSON.stringify(machine.getContext())), // Deep clone
+        eventLog: [...eventLog],
+        eventSeq,
+      };
+      setHistory(prev => [...prev, snapshot]);
+
       const event = payload || { type: eventType };
       machine.send(event);
+      
+      const newSeq = eventSeq + 1;
+      const resultingState = {
+        value: machine.getStateValue(),
+        context: machine.getContext(),
+      };
+      
+      // Add to event log
+      setEventLog(prev => [...prev, {
+        seq: newSeq,
+        type: eventType,
+        payload: event,
+        timestamp: Date.now(),
+        resultingState,
+      }]);
+      setEventSeq(newSeq);
+      
       setActiveStates(new Set(machine.getActiveStateNodes()));
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to send event');
     }
-  }, [machine]);
+  }, [machine, eventSeq, eventLog]);
+
+  const handleGoBack = useCallback((steps: number = 1) => {
+    if (history.length === 0 || !config) return;
+    
+    const stepsToGoBack = Math.min(steps, history.length);
+    const targetSnapshot = history[history.length - stepsToGoBack];
+    
+    // Recreate machine from scratch with the saved context
+    const newMachine = new StateMachine({
+      ...config,
+      initialContext: targetSnapshot.context,
+    }).start();
+    
+    // Manually set the state (this is a workaround - state machines typically don't support this)
+    // For now, we'll just reset and replay events
+    setMachine(newMachine);
+    setActiveStates(new Set(newMachine.getActiveStateNodes()));
+    setEventLog(targetSnapshot.eventLog);
+    setEventSeq(targetSnapshot.eventSeq);
+    setHistory(prev => prev.slice(0, prev.length - stepsToGoBack));
+  }, [history, config]);
 
   const handleReset = useCallback(() => {
     loadConfiguration();
   }, [loadConfiguration]);
 
+  const handleClearLog = useCallback(() => {
+    setEventLog([]);
+    setEventSeq(0);
+  }, []);
+
   const loadExample = useCallback((exampleKey: keyof typeof examples) => {
     setCode(examples[exampleKey]);
-    setMachine(null);
-    setConfig(null);
-    setError(null);
+    
+    // Auto-load the example immediately
+    try {
+      const loadedConfig = eval(examples[exampleKey]);
+      
+      if (!loadedConfig || typeof loadedConfig !== 'object') {
+        throw new Error('Configuration must be an object');
+      }
+      if (!loadedConfig.initialContext) {
+        throw new Error('Configuration must have initialContext property');
+      }
+      if (!loadedConfig.initial) {
+        throw new Error('Configuration must have initial property');
+      }
+      if (!loadedConfig.states) {
+        throw new Error('Configuration must have states property');
+      }
+      
+      const newMachine = new StateMachine(loadedConfig).start();
+      setMachine(newMachine);
+      setConfig(loadedConfig);
+      setActiveStates(new Set(newMachine.getActiveStateNodes()));
+      setError(null);
+      setEventLog([]);
+      setEventSeq(0);
+      setHistory([]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load configuration');
+      setMachine(null);
+      setConfig(null);
+    }
   }, []);
 
   return (
@@ -171,6 +291,19 @@ function App() {
         <div className="mb-6">
           <div className="flex gap-2 border-b border-slate-300 dark:border-slate-700">
             <button
+              onClick={() => setActiveTab('controls')}
+              className={`px-6 py-3 font-semibold transition relative ${
+                activeTab === 'controls'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Controls & State
+              {activeTab === 'controls' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('editor')}
               className={`px-6 py-3 font-semibold transition relative ${
                 activeTab === 'editor'
@@ -178,7 +311,7 @@ function App() {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              Code Editor & Controls
+              Code Editor
               {activeTab === 'editor' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
               )}
@@ -201,32 +334,11 @@ function App() {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'editor' && (
+        {activeTab === 'controls' && (
           <div className="grid grid-cols-2 gap-6">
-            {/* Left Column - Editor */}
+            {/* Left Column - State & Controls */}
             <div className="space-y-6">
-              <CodeEditor value={code} onChange={setCode} />
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={loadConfiguration}
-                  className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-lg transition shadow-lg"
-                >
-                  Load & Start Machine
-                </button>
-                <button
-                  onClick={handleReset}
-                  disabled={!machine}
-                  className="px-6 py-3 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-slate-900 dark:text-white rounded-lg font-bold transition"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-
-            {/* Right Column - State & Controls */}
-            <div className="space-y-6">
-              {machine && (
+              {machine ? (
                 <>
                   <StateDisplay 
                     stateValue={machine.getStateValue()}
@@ -239,9 +351,7 @@ function App() {
                     disabled={machine.isHalted()}
                   />
                 </>
-              )}
-              
-              {!machine && (
+              ) : (
                 <div className="bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl p-12 text-center">
                   <div className="text-6xl mb-4">🤖</div>
                   <p className="text-slate-600 dark:text-slate-400 text-lg">
@@ -249,6 +359,33 @@ function App() {
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* Right Column - Event Log */}
+            <div className="h-[800px]">
+              <EventLog events={eventLog} onClear={handleClearLog} />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'editor' && (
+          <div className="space-y-6">
+            <CodeEditor value={code} onChange={setCode} />
+            
+            <div className="flex gap-3">
+              <button
+                onClick={loadConfiguration}
+                className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-lg transition shadow-lg"
+              >
+                Load & Start Machine
+              </button>
+              <button
+                onClick={handleReset}
+                disabled={!machine}
+                className="px-6 py-3 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-slate-900 dark:text-white rounded-lg font-bold transition"
+              >
+                Reset
+              </button>
             </div>
           </div>
         )}
@@ -258,9 +395,22 @@ function App() {
             config={config}
             activeStates={activeStates}
             onEventClick={handleSendEvent}
+            onReset={handleReset}
+            onGoBack={handleGoBack}
+            canGoBack={history.length > 0}
+            isHalted={machine.isHalted()}
           />
         )}
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
 
       {/* Footer */}
       <footer className="mt-12 py-6 px-8 bg-slate-100 dark:bg-slate-900 border-t border-slate-300 dark:border-slate-800 text-center text-slate-600 dark:text-slate-500 text-sm">

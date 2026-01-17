@@ -75,11 +75,11 @@ export const examples = {
       submitAttempts: context.submitAttempts + 1 
     }),
     setErrors: ({ context, event }) => ({
-      errors: event.errors || ['Validation failed']
+      errors: event.payload?.errors || ['Validation failed']
     }),
     clearErrors: () => ({ errors: [] }),
     updateForm: ({ context, event }) => ({
-      formData: { ...context.formData, ...event.data }
+      formData: { ...context.formData, ...event.payload }
     }),
   },
   

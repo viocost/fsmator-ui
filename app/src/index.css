@@ -8,8 +8,6 @@
   font-weight: 400;
 
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #0f172a;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -32,4 +30,33 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+/* Fullscreen styling */
+:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+::backdrop {
+  background-color: rgba(0, 0, 0, 0.95);
+}
+
+/* Toast animation */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
 }
