@@ -3,6 +3,7 @@ export const examples = {
 ({
   initialContext: { count: 0 },
   initial: 'active',
+  timeTravel: true,
   
   reducers: {
     increment: ({ context }) => ({ count: context.count + 1 }),
@@ -28,6 +29,7 @@ export const examples = {
     timestamp: Date.now()
   },
   initial: 'green',
+  timeTravel: true,
   
   reducers: {
     incrementCycle: ({ context }) => ({ 
@@ -63,6 +65,7 @@ export const examples = {
     submitAttempts: 0,
   },
   initial: 'editing',
+  timeTravel: true,
   
   guards: {
     isValid: ({ context }) => 
@@ -132,6 +135,7 @@ export const examples = {
     currentTime: 0
   },
   initial: 'player',
+  timeTravel: true,
   
   reducers: {
     play: () => ({ isPlaying: true }),

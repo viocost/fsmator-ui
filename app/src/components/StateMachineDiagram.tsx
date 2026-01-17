@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import cytoscape, { Core } from 'cytoscape';
 // @ts-ignore
 import dagre from 'cytoscape-dagre';
@@ -6,6 +6,7 @@ import type { StateMachineConfig, StateConfig } from '@/lib/state-machine/types'
 import { useTheme } from '@/contexts/ThemeContext';
 import PayloadModal from './PayloadModal';
 import ContextMenu from './ContextMenu';
+import EventListMenu from './EventListMenu';
 
 // Register dagre layout
 cytoscape.use(dagre);
@@ -15,8 +16,6 @@ interface StateMachineDiagramProps {
   activeStates: Set<string>;
   onEventClick: (eventType: string, payload?: any) => void;
   onReset: () => void;
-  onGoBack: (steps: number) => void;
-  canGoBack: boolean;
   isHalted: boolean;
 }
 
@@ -27,8 +26,6 @@ export default function StateMachineDiagram({
   activeStates,
   onEventClick,
   onReset,
-  onGoBack,
-  canGoBack,
   isHalted,
 }: StateMachineDiagramProps) {
   const { theme } = useTheme();
@@ -40,6 +37,31 @@ export default function StateMachineDiagram({
   const [modalMode, setModalMode] = useState<ModalMode>('payload');
   const [selectedEventType, setSelectedEventType] = useState<string>('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; eventType: string } | null>(null);
+  const [nodeContextMenu, setNodeContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  // Extract all available events from config (including non-transition events)
+  const availableEvents = useMemo(() => {
+    const events = new Set<string>();
+    
+    const extractEvents = (stateConfig: StateConfig<any>) => {
+      if (stateConfig.on) {
+        for (const eventType of Object.keys(stateConfig.on)) {
+          events.add(eventType);
+        }
+      }
+      if (stateConfig.states) {
+        for (const childConfig of Object.values(stateConfig.states)) {
+          extractEvents(childConfig);
+        }
+      }
+    };
+    
+    for (const stateConfig of Object.values(config.states)) {
+      extractEvents(stateConfig);
+    }
+    
+    return Array.from(events).sort();
+  }, [config]);
 
   // Handle fullscreen change events
   useEffect(() => {
@@ -253,6 +275,28 @@ export default function StateMachineDiagram({
       node.connectedEdges().addClass('highlighted');
     });
 
+    // Right-click on node to show event menu
+    cyRef.current.on('cxttap', 'node', (evt) => {
+      const node = evt.target;
+      
+      // Don't show menu for start nodes
+      if (node.data('isStartNode')) {
+        return;
+      }
+      
+      evt.preventDefault();
+      const position = evt.renderedPosition || evt.position;
+      setNodeContextMenu({
+        x: position.x,
+        y: position.y,
+      });
+      
+      // Highlight
+      cyRef.current?.elements().removeClass('highlighted');
+      node.addClass('highlighted');
+      node.connectedEdges().addClass('highlighted');
+    });
+
     cyRef.current.on('tap', (evt) => {
       if (evt.target === cyRef.current) {
         cyRef.current?.elements().removeClass('highlighted');
@@ -337,20 +381,11 @@ export default function StateMachineDiagram({
     }
   };
 
-  const handleSendCustom = () => {
-    if (contextMenu) {
-      setSelectedEventType(contextMenu.eventType);
-      setModalMode('custom');
-      setModalOpen(true);
-      setContextMenu(null);
-    }
-  };
-
-  const handleSendCustomEvent = () => {
-    // Open modal for custom event
-    setSelectedEventType('CUSTOM');
-    setModalMode('custom');
+  const handleNodeEventSelect = (eventType: string) => {
+    setSelectedEventType(eventType);
+    setModalMode('payload');
     setModalOpen(true);
+    setNodeContextMenu(null);
   };
 
   return (
@@ -368,8 +403,17 @@ export default function StateMachineDiagram({
           x={contextMenu.x}
           y={contextMenu.y}
           onSendWithPayload={handleSendWithPayload}
-          onSendCustom={handleSendCustom}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {nodeContextMenu && (
+        <EventListMenu
+          x={nodeContextMenu.x}
+          y={nodeContextMenu.y}
+          events={availableEvents}
+          onEventSelect={handleNodeEventSelect}
+          onClose={() => setNodeContextMenu(null)}
         />
       )}
 
@@ -394,21 +438,6 @@ export default function StateMachineDiagram({
         
         <div className="flex gap-2 items-center">
           {/* Action buttons */}
-          <button
-            onClick={() => onGoBack(1)}
-            disabled={!canGoBack}
-            className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded text-sm transition font-semibold"
-            title="Go back 1 step"
-          >
-            ← Back
-          </button>
-          <button
-            onClick={handleSendCustomEvent}
-            className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-sm transition font-semibold"
-            title="Send custom event"
-          >
-            Custom Event
-          </button>
           <button
             onClick={onReset}
             className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-sm transition font-semibold"

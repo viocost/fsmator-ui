@@ -12,13 +12,6 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 type Tab = 'controls' | 'editor' | 'diagram';
 
-interface MachineSnapshot {
-  stateValue: any;
-  context: any;
-  eventLog: EventLogEntry[];
-  eventSeq: number;
-}
-
 function App() {
   const { theme, toggleTheme } = useTheme();
   const [code, setCode] = useState(examples.counter);
@@ -29,7 +22,6 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>('controls');
   const [eventLog, setEventLog] = useState<EventLogEntry[]>([]);
   const [eventSeq, setEventSeq] = useState(0);
-  const [history, setHistory] = useState<MachineSnapshot[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
   const [initialized, setInitialized] = useState(false);
 
@@ -103,7 +95,6 @@ function App() {
       setError(null);
       setEventLog([]);
       setEventSeq(0);
-      setHistory([]);
     } catch (err: any) {
       setError(err.message || 'Failed to load configuration');
       setMachine(null);
@@ -122,15 +113,6 @@ function App() {
     if (!machine) return;
 
     try {
-      // Save current state to history before making changes
-      const snapshot: MachineSnapshot = {
-        stateValue: machine.getStateValue(),
-        context: JSON.parse(JSON.stringify(machine.getContext())), // Deep clone
-        eventLog: [...eventLog],
-        eventSeq,
-      };
-      setHistory(prev => [...prev, snapshot]);
-
       const event = payload || { type: eventType };
       machine.send(event);
       
@@ -155,28 +137,34 @@ function App() {
     } catch (err: any) {
       setError(err.message || 'Failed to send event');
     }
-  }, [machine, eventSeq, eventLog]);
+  }, [machine, eventSeq]);
 
-  const handleGoBack = useCallback((steps: number = 1) => {
-    if (history.length === 0 || !config) return;
+  const handleRewind = useCallback((steps: number = 1) => {
+    if (!machine) return;
     
-    const stepsToGoBack = Math.min(steps, history.length);
-    const targetSnapshot = history[history.length - stepsToGoBack];
+    try {
+      machine.rewind(steps);
+      setActiveStates(new Set(machine.getActiveStateNodes()));
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to rewind');
+    }
+  }, [machine]);
+
+  const handleForward = useCallback((steps: number = 1) => {
+    if (!machine) return;
     
-    // Recreate machine from scratch with the saved context
-    const newMachine = new StateMachine({
-      ...config,
-      initialContext: targetSnapshot.context,
-    }).start();
-    
-    // Manually set the state (this is a workaround - state machines typically don't support this)
-    // For now, we'll just reset and replay events
-    setMachine(newMachine);
-    setActiveStates(new Set(newMachine.getActiveStateNodes()));
-    setEventLog(targetSnapshot.eventLog);
-    setEventSeq(targetSnapshot.eventSeq);
-    setHistory(prev => prev.slice(0, prev.length - stepsToGoBack));
-  }, [history, config]);
+    try {
+      machine.ff(steps);
+      setActiveStates(new Set(machine.getActiveStateNodes()));
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fast-forward');
+    }
+  }, [machine]);
+
+  const canRewind = machine ? machine.getHistoryIndex() > 0 : false;
+  const canForward = machine ? machine.getHistoryIndex() < machine.getHistoryLength() - 1 : false;
 
   const handleReset = useCallback(() => {
     loadConfiguration();
@@ -214,7 +202,6 @@ function App() {
       setError(null);
       setEventLog([]);
       setEventSeq(0);
-      setHistory([]);
     } catch (err: any) {
       setError(err.message || 'Failed to load configuration');
       setMachine(null);
@@ -340,6 +327,34 @@ function App() {
             <div className="space-y-6">
               {machine ? (
                 <>
+                  {/* Time Controls */}
+                  <div className="bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl p-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Time Travel</h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleRewind(1)}
+                          disabled={!canRewind}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded font-semibold transition text-sm"
+                          title="Rewind 1 step"
+                        >
+                          ⏪ Rewind
+                        </button>
+                        <button
+                          onClick={() => handleForward(1)}
+                          disabled={!canForward}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded font-semibold transition text-sm"
+                          title="Forward 1 step"
+                        >
+                          Fast Forward ⏩
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                      History: {machine.getHistoryIndex() + 1} / {machine.getHistoryLength()}
+                    </div>
+                  </div>
+
                   <StateDisplay 
                     stateValue={machine.getStateValue()}
                     context={machine.getContext()}
@@ -396,8 +411,6 @@ function App() {
             activeStates={activeStates}
             onEventClick={handleSendEvent}
             onReset={handleReset}
-            onGoBack={handleGoBack}
-            canGoBack={history.length > 0}
             isHalted={machine.isHalted()}
           />
         )}
