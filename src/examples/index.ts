@@ -127,17 +127,23 @@ export const examples = {
   },
 })`,
 
-  parallelMedia: `// Parallel Media Player Example
+  parallelMedia: `// Parallel Media Player Example (with Power On/Off)
 ({
   initialContext: { 
     volume: 50, 
     isPlaying: false,
-    currentTime: 0
+    currentTime: 0,
+    isPoweredOn: false
   },
-  initial: 'player',
+  initial: 'off',
   timeTravel: true,
   
   reducers: {
+    powerOn: () => ({ isPoweredOn: true }),
+    powerOff: () => ({ 
+      isPoweredOn: false, 
+      isPlaying: false 
+    }),
     play: () => ({ isPlaying: true }),
     pause: () => ({ isPlaying: false }),
     volumeUp: ({ context }) => ({ 
@@ -151,8 +157,20 @@ export const examples = {
   },
   
   states: {
-    player: {
+    off: {
+      on: {
+        POWER_ON: { target: 'on', assign: 'powerOn' },
+      },
+    },
+    
+    on: {
       type: 'parallel',
+      onExit: ['powerOff'],
+      
+      on: {
+        POWER_OFF: 'off',
+      },
+      
       states: {
         playback: {
           initial: 'paused',

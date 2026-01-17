@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { StateMachine } from '@/lib/state-machine/state-machine';
-import type { StateMachineConfig } from '@/lib/state-machine/types';
+import { StateMachine, type StateMachineConfig } from 'fsmator';
 import StateMachineDiagram from '@/components/StateMachineDiagram';
 import CodeEditor from '@/components/CodeEditor';
 import StateDisplay from '@/components/StateDisplay';
@@ -237,35 +236,6 @@ function App() {
       </header>
 
       <div className="max-w-[1800px] mx-auto p-8">
-        {/* Example Selector */}
-        <div className="mb-6 flex gap-3 items-center flex-wrap">
-          <span className="text-slate-600 dark:text-slate-400 font-semibold">Load Example:</span>
-          <button
-            onClick={() => loadExample('counter')}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-semibold transition text-sm"
-          >
-            Counter
-          </button>
-          <button
-            onClick={() => loadExample('trafficLight')}
-            className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded font-semibold transition text-sm"
-          >
-            Traffic Light
-          </button>
-          <button
-            onClick={() => loadExample('formWorkflow')}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded font-semibold transition text-sm"
-          >
-            Form Workflow
-          </button>
-          <button
-            onClick={() => loadExample('parallelMedia')}
-            className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded font-semibold transition text-sm"
-          >
-            Media Player
-          </button>
-        </div>
-
         {/* Error Display */}
         {error && (
           <div className="mb-6 bg-red-100 dark:bg-red-500/20 border-2 border-red-500 rounded-lg p-4">
@@ -385,7 +355,7 @@ function App() {
 
         {activeTab === 'editor' && (
           <div className="space-y-6">
-            <CodeEditor value={code} onChange={setCode} />
+            <CodeEditor value={code} onChange={setCode} onLoadExample={loadExample} />
             
             <div className="flex gap-3">
               <button
@@ -411,7 +381,14 @@ function App() {
             activeStates={activeStates}
             onEventClick={handleSendEvent}
             onReset={handleReset}
+            onRewind={handleRewind}
+            onForward={handleForward}
+            canRewind={canRewind}
+            canForward={canForward}
+            historyIndex={machine.getHistoryIndex()}
+            historyLength={machine.getHistoryLength()}
             isHalted={machine.isHalted()}
+            onShowToast={(message, type) => setToast({ message, type })}
           />
         )}
       </div>

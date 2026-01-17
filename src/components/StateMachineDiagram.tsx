@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import cytoscape, { Core } from 'cytoscape';
 // @ts-ignore
 import dagre from 'cytoscape-dagre';
-import type { StateMachineConfig, StateConfig } from '@/lib/state-machine/types';
+import type { StateMachineConfig, StateConfig } from 'fsmator';
 import { useTheme } from '@/contexts/ThemeContext';
 import PayloadModal from './PayloadModal';
 import ContextMenu from './ContextMenu';
@@ -16,17 +16,31 @@ interface StateMachineDiagramProps {
   activeStates: Set<string>;
   onEventClick: (eventType: string, payload?: any) => void;
   onReset: () => void;
+  onRewind: (steps: number) => void;
+  onForward: (steps: number) => void;
+  canRewind: boolean;
+  canForward: boolean;
+  historyIndex: number;
+  historyLength: number;
   isHalted: boolean;
+  onShowToast: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
 type ModalMode = 'payload' | 'custom';
 
-export default function StateMachineDiagram({ 
-  config, 
+export default function StateMachineDiagram({
+  config,
   activeStates,
   onEventClick,
   onReset,
+  onRewind,
+  onForward,
+  canRewind,
+  canForward,
+  historyIndex,
+  historyLength,
   isHalted,
+  onShowToast,
 }: StateMachineDiagramProps) {
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,7 +56,7 @@ export default function StateMachineDiagram({
   // Extract all available events from config (including non-transition events)
   const availableEvents = useMemo(() => {
     const events = new Set<string>();
-    
+
     const extractEvents = (stateConfig: StateConfig<any>) => {
       if (stateConfig.on) {
         for (const eventType of Object.keys(stateConfig.on)) {
@@ -55,11 +69,11 @@ export default function StateMachineDiagram({
         }
       }
     };
-    
+
     for (const stateConfig of Object.values(config.states)) {
       extractEvents(stateConfig);
     }
-    
+
     return Array.from(events).sort();
   }, [config]);
 
@@ -80,6 +94,21 @@ export default function StateMachineDiagram({
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Prevent default browser context menu on the diagram
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      if (containerRef.current && containerRef.current.contains(e.target as Node)) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
     };
   }, []);
 
@@ -104,7 +133,7 @@ export default function StateMachineDiagram({
     cyRef.current = cytoscape({
       container: containerRef.current,
       elements,
-      wheelSensitivity: 0.1,
+      wheelSensitivity: 3.0,
       style: [
         {
           selector: 'node',
@@ -236,7 +265,7 @@ export default function StateMachineDiagram({
     cyRef.current.on('tap', 'edge', (evt) => {
       const edge = evt.target;
       const edgeData = edge.data();
-      
+
       if (edgeData.eventType && !edgeData.isStartEdge) {
         // Left click: send event directly
         onEventClick(edgeData.eventType);
@@ -251,9 +280,8 @@ export default function StateMachineDiagram({
     cyRef.current.on('cxttap', 'edge', (evt) => {
       const edge = evt.target;
       const edgeData = edge.data();
-      
+
       if (edgeData.eventType && !edgeData.isStartEdge) {
-        evt.preventDefault();
         const position = evt.renderedPosition || evt.position;
         setContextMenu({
           x: position.x,
@@ -269,7 +297,7 @@ export default function StateMachineDiagram({
 
     cyRef.current.on('tap', 'node', (evt) => {
       const node = evt.target;
-      
+
       cyRef.current?.elements().removeClass('highlighted');
       node.addClass('highlighted');
       node.connectedEdges().addClass('highlighted');
@@ -278,19 +306,18 @@ export default function StateMachineDiagram({
     // Right-click on node to show event menu
     cyRef.current.on('cxttap', 'node', (evt) => {
       const node = evt.target;
-      
+
       // Don't show menu for start nodes
       if (node.data('isStartNode')) {
         return;
       }
-      
-      evt.preventDefault();
+
       const position = evt.renderedPosition || evt.position;
       setNodeContextMenu({
         x: position.x,
         y: position.y,
       });
-      
+
       // Highlight
       cyRef.current?.elements().removeClass('highlighted');
       node.addClass('highlighted');
@@ -300,6 +327,9 @@ export default function StateMachineDiagram({
     cyRef.current.on('tap', (evt) => {
       if (evt.target === cyRef.current) {
         cyRef.current?.elements().removeClass('highlighted');
+        // Close any open menus when clicking on background
+        setContextMenu(null);
+        setNodeContextMenu(null);
       }
     });
 
@@ -314,7 +344,7 @@ export default function StateMachineDiagram({
 
     cyRef.current.nodes().removeClass('active');
     cyRef.current.nodes().removeClass('halted');
-    
+
     activeStates.forEach((stateId) => {
       const node = cyRef.current?.getElementById(stateId);
       if (node && node.length > 0) {
@@ -365,6 +395,11 @@ export default function StateMachineDiagram({
 
   const handleSendEvent = (eventType: string, payload?: any) => {
     onEventClick(eventType, payload);
+    // Show toast notification
+    const payloadText = payload && Object.keys(payload).length > 0
+      ? ` with payload`
+      : '';
+    onShowToast(`Event sent: ${eventType}${payloadText}`, 'success');
   };
 
   const handleCloseModal = () => {
@@ -417,93 +452,114 @@ export default function StateMachineDiagram({
         />
       )}
 
-      <div 
+      <div
         ref={wrapperRef}
-        className={`bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl p-4 ${
-          isFullscreen ? 'bg-white dark:bg-slate-950' : ''
-        }`}
+        className={`bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl p-4 ${isFullscreen ? 'bg-white dark:bg-slate-950' : ''
+          }`}
       >
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">State Machine Diagram</h2>
-          
-          {/* Halted indicator */}
-          {isHalted && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-orange-500 text-white rounded-lg font-semibold text-sm">
-              <span>⚠</span>
-              <span>State Machine Halted</span>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex gap-2 items-center">
-          {/* Action buttons */}
-          <button
-            onClick={onReset}
-            className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-sm transition font-semibold"
-            title="Reset machine"
-          >
-            Reset
-          </button>
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">State Machine Diagram</h2>
 
-          {/* Legend */}
-          <div className="flex gap-4 ml-4 border-l border-slate-400 dark:border-slate-600 pl-4">
-            <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-              <div className="w-4 h-4 rounded bg-blue-500 border-2 border-blue-600"></div>
-              <span>Inactive</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-              <div className="w-4 h-4 rounded bg-green-500 border-2 border-green-600"></div>
-              <span>Active</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-              <div className="w-4 h-4 rounded bg-orange-500 border-2 border-orange-600"></div>
-              <span>Halted</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-              <div className="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-800 border-2 border-slate-500 dark:border-slate-600"></div>
-              <span>Start</span>
-            </div>
+            {/* Halted indicator */}
+            {isHalted && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-orange-500 text-white rounded-lg font-semibold text-sm">
+                <span>⚠</span>
+                <span>State Machine Halted</span>
+              </div>
+            )}
           </div>
 
-          {/* Zoom Controls */}
-          <div className="flex gap-2 ml-4 border-l border-slate-400 dark:border-slate-600 pl-4">
-          <button
-            onClick={handleZoomIn}
-            className="px-3 py-1 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded font-bold transition"
-            title="Zoom In"
-          >
-            +
-          </button>
-          <button
-            onClick={handleZoomOut}
-            className="px-3 py-1 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded font-bold transition"
-            title="Zoom Out"
-          >
-            -
-          </button>
-          <button
-            onClick={handleResetZoom}
-            className="px-3 py-1 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded text-sm transition"
-          >
-            Fit
-          </button>
-          <button
-            onClick={toggleFullscreen}
-            className="px-3 py-1 bg-slate-400 dark:bg-slate-600 hover:bg-slate-500 dark:hover:bg-slate-500 text-white rounded text-sm transition font-semibold"
-          >
-            {isFullscreen ? '✕ Exit' : '⛶ Fullscreen'}
-          </button>
+          <div className="flex gap-2 items-center">
+            {/* Time Travel Controls */}
+            <div className="flex items-center gap-2 bg-slate-200 dark:bg-slate-700 rounded-lg px-2 py-1">
+              <button
+                onClick={() => onRewind(1)}
+                disabled={!canRewind}
+                className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded text-xs transition font-semibold"
+                title="Rewind 1 step"
+              >
+                ⏪
+              </button>
+              <span className="text-xs font-mono text-slate-700 dark:text-slate-300 min-w-[60px] text-center">
+                {historyIndex + 1}/{historyLength}
+              </span>
+              <button
+                onClick={() => onForward(1)}
+                disabled={!canForward}
+                className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded text-xs transition font-semibold"
+                title="Fast forward 1 step"
+              >
+                ⏩
+              </button>
+            </div>
+
+            {/* Action buttons */}
+            <button
+              onClick={onReset}
+              className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-sm transition font-semibold"
+              title="Reset machine"
+            >
+              Reset
+            </button>
+
+            {/* Legend */}
+            <div className="flex gap-4 ml-4 border-l border-slate-400 dark:border-slate-600 pl-4">
+              <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <div className="w-4 h-4 rounded bg-blue-500 border-2 border-blue-600"></div>
+                <span>Inactive</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <div className="w-4 h-4 rounded bg-green-500 border-2 border-green-600"></div>
+                <span>Active</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <div className="w-4 h-4 rounded bg-orange-500 border-2 border-orange-600"></div>
+                <span>Halted</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <div className="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-800 border-2 border-slate-500 dark:border-slate-600"></div>
+                <span>Start</span>
+              </div>
+            </div>
+
+            {/* Zoom Controls */}
+            <div className="flex gap-2 ml-4 border-l border-slate-400 dark:border-slate-600 pl-4">
+              <button
+                onClick={handleZoomIn}
+                className="px-3 py-1 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded font-bold transition"
+                title="Zoom In"
+              >
+                +
+              </button>
+              <button
+                onClick={handleZoomOut}
+                className="px-3 py-1 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded font-bold transition"
+                title="Zoom Out"
+              >
+                -
+              </button>
+              <button
+                onClick={handleResetZoom}
+                className="px-3 py-1 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded text-sm transition"
+              >
+                Fit
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                className="px-3 py-1 bg-slate-400 dark:bg-slate-600 hover:bg-slate-500 dark:hover:bg-slate-500 text-white rounded text-sm transition font-semibold"
+              >
+                {isFullscreen ? '✕ Exit' : '⛶ Fullscreen'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div 
-        ref={containerRef} 
-        className={`bg-white dark:bg-slate-900 rounded border-2 border-slate-300 dark:border-slate-700 ${
-          isFullscreen ? 'h-[calc(100vh-6rem)] flex-1' : 'h-[600px]'
-        }`}
-      />
+
+        <div
+          ref={containerRef}
+          className={`bg-white dark:bg-slate-900 rounded border-2 border-slate-300 dark:border-slate-700 ${isFullscreen ? 'h-[calc(100vh-6rem)] flex-1' : 'h-[600px]'
+            }`}
+        />
       </div>
     </>
   );
@@ -614,17 +670,17 @@ function buildElements(config: StateMachineConfig<any, any>) {
     // Process transitions
     if (stateConfig.on) {
       for (const [eventType, transition] of Object.entries(stateConfig.on)) {
-        const transitionConfig = typeof transition === 'string' 
-          ? { target: transition } 
-          : Array.isArray(transition) 
-          ? transition[0] 
-          : transition;
+        const transitionConfig = typeof transition === 'string'
+          ? { target: transition }
+          : Array.isArray(transition)
+            ? transition[0]
+            : transition;
 
         if (transitionConfig && typeof transitionConfig === 'object') {
           const target = transitionConfig.target;
           if (target) {
             const fullTargetId = resolveTargetPath(target, fullStateId);
-            
+
             // Only create edge if target exists
             if (stateRegistry.has(fullTargetId)) {
               elements.push({
