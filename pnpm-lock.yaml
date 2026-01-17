@@ -18,8 +18,8 @@ importers:
         specifier: ^2.5.0
         version: 2.5.0(cytoscape@3.33.1)
       fsmator:
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -520,8 +520,8 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
 
-  fsmator@0.1.1:
-    resolution: {integrity: sha512-aKYmn6y+VFY4Gh4GR1F8XYkWC2Wq51dMMHYU9riW2YdNNhNEIq2L7fSOCBE+zK4EnIHEwj6BqfFuGH7sMc8tsA==}
+  fsmator@0.2.0:
+    resolution: {integrity: sha512-SgET0p9uIpRqUsqvS0Opurrmy5VKlObR+n3IMQwTSOYxTRNV7N4xW7tbikfE8zUJ36/CcVrrVXdVJVJcRmNK3g==}
 
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
@@ -1338,7 +1338,7 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
-  fsmator@0.1.1: {}
+  fsmator@0.2.0: {}
 
   function-bind@1.1.2: {}
 

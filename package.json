@@ -1,5 +1,5 @@
 {
-  "name": "state-machine-simulator",
+  "name": "fsmator-ui",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -13,7 +13,7 @@
     "@monaco-editor/react": "^4.6.0",
     "cytoscape": "^3.28.1",
     "cytoscape-dagre": "^2.5.0",
-    "fsmator": "^0.1.1",
+    "fsmator": "^0.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
