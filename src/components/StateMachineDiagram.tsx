@@ -100,20 +100,8 @@ export default function StateMachineDiagram({
     };
   }, []);
 
-  // Prevent default browser context menu on the diagram
-  useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => {
-      if (containerRef.current && containerRef.current.contains(e.target as Node)) {
-        e.preventDefault();
-        return false;
-      }
-    };
-
-    document.addEventListener('contextmenu', handleContextMenu);
-    return () => {
-      document.removeEventListener('contextmenu', handleContextMenu);
-    };
-  }, []);
+  // Note: We don't prevent contextmenu here because Cytoscape needs to detect it
+  // for cxttap events. The prevention happens in Cytoscape's event handlers.
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -336,7 +324,24 @@ export default function StateMachineDiagram({
       }
     });
 
+    // Prevent context menu on background right-click
+    cyRef.current.on('cxttap', (evt) => {
+      if (evt.target === cyRef.current) {
+        // Right-click on background - just close menus, no action needed
+        setContextMenu(null);
+        setNodeContextMenu(null);
+      }
+    });
+
+    // Prevent browser's default context menu after Cytoscape handles events
+    const container = containerRef.current;
+    const preventContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    container.addEventListener('contextmenu', preventContextMenu);
+
     return () => {
+      container.removeEventListener('contextmenu', preventContextMenu);
       cyRef.current?.destroy();
     };
   }, [config, onEventClick, theme]);
