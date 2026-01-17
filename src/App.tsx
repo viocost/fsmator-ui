@@ -379,6 +379,7 @@ function App() {
           <StateMachineDiagram
             config={config}
             activeStates={activeStates}
+            context={machine.getContext()}
             onEventClick={handleSendEvent}
             onReset={handleReset}
             onRewind={handleRewind}

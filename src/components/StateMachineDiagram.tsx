@@ -14,6 +14,7 @@ cytoscape.use(dagre);
 interface StateMachineDiagramProps {
   config: StateMachineConfig<any, any>;
   activeStates: Set<string>;
+  context: any;
   onEventClick: (eventType: string, payload?: any) => void;
   onReset: () => void;
   onRewind: (steps: number) => void;
@@ -28,9 +29,10 @@ interface StateMachineDiagramProps {
 
 type ModalMode = 'payload' | 'custom';
 
-export default function StateMachineDiagram({
-  config,
+export default function StateMachineDiagram({ 
+  config, 
   activeStates,
+  context,
   onEventClick,
   onReset,
   onRewind,
@@ -52,6 +54,7 @@ export default function StateMachineDiagram({
   const [selectedEventType, setSelectedEventType] = useState<string>('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; eventType: string } | null>(null);
   const [nodeContextMenu, setNodeContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showContextOverlay, setShowContextOverlay] = useState(true);
 
   // Extract all available events from config (including non-transition events)
   const availableEvents = useMemo(() => {
@@ -555,11 +558,44 @@ export default function StateMachineDiagram({
           </div>
         </div>
 
-        <div
-          ref={containerRef}
-          className={`bg-white dark:bg-slate-900 rounded border-2 border-slate-300 dark:border-slate-700 ${isFullscreen ? 'h-[calc(100vh-6rem)] flex-1' : 'h-[600px]'
+        {/* Diagram container wrapper with relative positioning */}
+        <div className="relative">
+          <div 
+            ref={containerRef} 
+            className={`bg-white dark:bg-slate-900 rounded border-2 border-slate-300 dark:border-slate-700 ${
+              isFullscreen ? 'h-[calc(100vh-6rem)] flex-1' : 'h-[600px]'
             }`}
-        />
+          />
+          
+          {/* Context Overlay - positioned over the diagram */}
+          {showContextOverlay ? (
+            <div className="absolute top-4 right-4 z-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-w-sm max-h-[calc(100%-2rem)] overflow-hidden flex flex-col pointer-events-auto">
+              <div className="sticky top-0 bg-slate-100 dark:bg-slate-700 px-3 py-2 border-b border-slate-300 dark:border-slate-600 flex justify-between items-center">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Context</h3>
+                <button
+                  onClick={() => setShowContextOverlay(false)}
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition"
+                  title="Hide context"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-3 overflow-auto flex-1">
+                <pre className="text-xs font-mono text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
+                  {JSON.stringify(context, null, 2)}
+                </pre>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowContextOverlay(true)}
+              className="absolute top-4 right-4 z-10 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-lg text-xs font-bold text-slate-900 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600 transition pointer-events-auto"
+              title="Show context"
+            >
+              Show Context
+            </button>
+          )}
+        </div>
       </div>
     </>
   );
