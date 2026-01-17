@@ -23,6 +23,7 @@ function App() {
   const [eventSeq, setEventSeq] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   // Auto-load counter example on first mount
   useEffect(() => {
@@ -162,6 +163,47 @@ function App() {
     }
   }, [machine]);
 
+  const handleFullRewind = useCallback(() => {
+    if (!machine) return;
+    const currentIndex = machine.getHistoryIndex();
+    if (currentIndex > 0) {
+      handleRewind(currentIndex);
+    }
+  }, [machine, handleRewind]);
+
+  const handleFullForward = useCallback(() => {
+    if (!machine) return;
+    const currentIndex = machine.getHistoryIndex();
+    const maxIndex = machine.getHistoryLength() - 1;
+    if (currentIndex < maxIndex) {
+      handleForward(maxIndex - currentIndex);
+    }
+  }, [machine, handleForward]);
+
+  const handlePlay = useCallback(() => {
+    setIsPlaying(true);
+  }, []);
+
+  const handlePause = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
+
+  // Auto-play: step forward every second when playing
+  useEffect(() => {
+    if (!isPlaying || !machine) return;
+
+    const interval = setInterval(() => {
+      if (machine.getHistoryIndex() < machine.getHistoryLength() - 1) {
+        handleForward(1);
+      } else {
+        // Reached the end, stop playing
+        setIsPlaying(false);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, machine, handleForward]);
+
   const canRewind = machine ? machine.getHistoryIndex() > 0 : false;
   const canForward = machine ? machine.getHistoryIndex() < machine.getHistoryLength() - 1 : false;
 
@@ -299,29 +341,63 @@ function App() {
                 <>
                   {/* Time Controls */}
                   <div className="bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Time Travel</h3>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleRewind(1)}
-                          disabled={!canRewind}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded font-semibold transition text-sm"
-                          title="Rewind 1 step"
-                        >
-                          ⏪ Rewind
-                        </button>
-                        <button
-                          onClick={() => handleForward(1)}
-                          disabled={!canForward}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded font-semibold transition text-sm"
-                          title="Forward 1 step"
-                        >
-                          Fast Forward ⏩
-                        </button>
+                      <div className="text-sm text-slate-600 dark:text-slate-400 font-mono">
+                        {machine.getHistoryIndex() + 1} / {machine.getHistoryLength()}
                       </div>
                     </div>
-                    <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                      History: {machine.getHistoryIndex() + 1} / {machine.getHistoryLength()}
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={handleFullRewind}
+                        disabled={!canRewind || isPlaying}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded font-semibold transition text-sm"
+                        title="Rewind to start"
+                      >
+                        ⏮ Start
+                      </button>
+                      <button
+                        onClick={() => handleRewind(1)}
+                        disabled={!canRewind || isPlaying}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded font-semibold transition text-sm"
+                        title="Rewind 1 step"
+                      >
+                        ⏪ Back
+                      </button>
+                      {isPlaying ? (
+                        <button
+                          onClick={handlePause}
+                          className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded font-semibold transition text-sm"
+                          title="Pause playback"
+                        >
+                          ⏸ Pause
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handlePlay}
+                          disabled={!canForward}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded font-semibold transition text-sm"
+                          title="Play (step forward every second)"
+                        >
+                          ▶ Play
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleForward(1)}
+                        disabled={!canForward || isPlaying}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded font-semibold transition text-sm"
+                        title="Forward 1 step"
+                      >
+                        Forward ⏩
+                      </button>
+                      <button
+                        onClick={handleFullForward}
+                        disabled={!canForward || isPlaying}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded font-semibold transition text-sm"
+                        title="Fast forward to end"
+                      >
+                        End ⏭
+                      </button>
                     </div>
                   </div>
 
@@ -385,11 +461,16 @@ function App() {
             onReset={handleReset}
             onRewind={handleRewind}
             onForward={handleForward}
+            onFullRewind={handleFullRewind}
+            onFullForward={handleFullForward}
+            onPlay={handlePlay}
+            onPause={handlePause}
             canRewind={canRewind}
             canForward={canForward}
             historyIndex={machine.getHistoryIndex()}
             historyLength={machine.getHistoryLength()}
             isHalted={machine.isHalted()}
+            isPlaying={isPlaying}
             onShowToast={(message, type) => setToast({ message, type })}
             onClearLog={handleClearLog}
           />

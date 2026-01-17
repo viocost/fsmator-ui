@@ -21,11 +21,16 @@ interface StateMachineDiagramProps {
   onReset: () => void;
   onRewind: (steps: number) => void;
   onForward: (steps: number) => void;
+  onFullRewind: () => void;
+  onFullForward: () => void;
+  onPlay: () => void;
+  onPause: () => void;
   canRewind: boolean;
   canForward: boolean;
   historyIndex: number;
   historyLength: number;
   isHalted: boolean;
+  isPlaying: boolean;
   onShowToast: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
   onClearLog: () => void;
 }
@@ -41,11 +46,16 @@ export default function StateMachineDiagram({
   onReset,
   onRewind,
   onForward,
+  onFullRewind,
+  onFullForward,
+  onPlay,
+  onPause,
   canRewind,
   canForward,
   historyIndex,
   historyLength,
   isHalted,
+  isPlaying,
   onShowToast,
   onClearLog,
 }: StateMachineDiagramProps) {
@@ -487,25 +497,59 @@ export default function StateMachineDiagram({
 
           <div className="flex gap-2 items-center">
             {/* Time Travel Controls */}
-            <div className="flex items-center gap-2 bg-slate-200 dark:bg-slate-700 rounded-lg px-2 py-1">
+            <div className="flex items-center gap-1 bg-slate-200 dark:bg-slate-700 rounded-lg px-2 py-1">
+              <button
+                onClick={onFullRewind}
+                disabled={!canRewind || isPlaying}
+                className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded text-xs transition font-semibold"
+                title="Rewind to start"
+              >
+                ⏮
+              </button>
               <button
                 onClick={() => onRewind(1)}
-                disabled={!canRewind}
+                disabled={!canRewind || isPlaying}
                 className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded text-xs transition font-semibold"
                 title="Rewind 1 step"
               >
                 ⏪
               </button>
+              {isPlaying ? (
+                <button
+                  onClick={onPause}
+                  className="px-2 py-1 bg-orange-600 hover:bg-orange-500 text-white rounded text-xs transition font-semibold"
+                  title="Pause playback"
+                >
+                  ⏸
+                </button>
+              ) : (
+                <button
+                  onClick={onPlay}
+                  disabled={!canForward}
+                  className="px-2 py-1 bg-green-600 hover:bg-green-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded text-xs transition font-semibold"
+                  title="Play (step forward every second)"
+                >
+                  ▶
+                </button>
+              )}
               <span className="text-xs font-mono text-slate-700 dark:text-slate-300 min-w-[60px] text-center">
                 {historyIndex + 1}/{historyLength}
               </span>
               <button
                 onClick={() => onForward(1)}
-                disabled={!canForward}
+                disabled={!canForward || isPlaying}
                 className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded text-xs transition font-semibold"
                 title="Fast forward 1 step"
               >
                 ⏩
+              </button>
+              <button
+                onClick={onFullForward}
+                disabled={!canForward || isPlaying}
+                className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded text-xs transition font-semibold"
+                title="Fast forward to end"
+              >
+                ⏭
               </button>
             </div>
 
@@ -647,77 +691,92 @@ export default function StateMachineDiagram({
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {eventLog.map((event, index) => (
-                      <div
-                        key={index}
-                        className="bg-white dark:bg-slate-900 rounded border border-slate-300 dark:border-slate-700 overflow-hidden"
-                      >
-                        <button
-                          onClick={() => setExpandedEventIndex(expandedEventIndex === index ? null : index)}
-                          className="w-full px-2 py-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
+                    {eventLog.map((event, index) => {
+                      // historyIndex 0 = initial state (no event yet)
+                      // historyIndex 1 = after first event (event index 0)
+                      // So current event is historyIndex - 1
+                      const isCurrentEvent = index === historyIndex - 1;
+                      
+                      return (
+                        <div
+                          key={index}
+                          className={`rounded border overflow-hidden ${
+                            isCurrentEvent 
+                              ? 'bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-600 ring-2 ring-green-500 dark:ring-green-600' 
+                              : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700'
+                          }`}
                         >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="font-mono text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded font-bold flex-shrink-0">
-                              #{event.seq}
-                            </span>
-                            <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
-                              {event.type}
-                            </span>
-                          </div>
-                          <span className="text-slate-400 dark:text-slate-500 text-xs flex-shrink-0">
-                            {expandedEventIndex === index ? '▼' : '▶'}
-                          </span>
-                        </button>
-
-                        {expandedEventIndex === index && (
-                          <div className="px-2 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950">
-                            <div className="space-y-2">
-                              {/* Timestamp */}
-                              <div>
-                                <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                                  Time
-                                </h4>
-                                <p className="text-xs font-mono text-slate-800 dark:text-slate-200">
-                                  {(() => {
-                                    const date = new Date(event.timestamp);
-                                    return date.toLocaleTimeString('en-US', { 
-                                      hour12: false, 
-                                      hour: '2-digit', 
-                                      minute: '2-digit', 
-                                      second: '2-digit'
-                                    }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
-                                  })()}
-                                </p>
-                              </div>
-
-                              {/* Payload */}
-                              {event.payload && Object.keys(event.payload).length > 0 && (
-                                <div>
-                                  <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                                    Payload
-                                  </h4>
-                                  <pre className="text-xs bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-700 overflow-x-auto font-mono text-slate-800 dark:text-slate-200">
-                                    {JSON.stringify(event.payload, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
-
-                              {/* Resulting State */}
-                              {event.resultingState && (
-                                <div>
-                                  <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                                    State
-                                  </h4>
-                                  <pre className="text-xs bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-700 overflow-x-auto font-mono text-slate-800 dark:text-slate-200">
-                                    {JSON.stringify(event.resultingState, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
+                          <button
+                            onClick={() => setExpandedEventIndex(expandedEventIndex === index ? null : index)}
+                            className="w-full px-2 py-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
+                          >
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <span className={`font-mono text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${
+                                isCurrentEvent
+                                  ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
+                                  : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                              }`}>
+                                #{event.seq}
+                              </span>
+                              <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+                                {event.type}
+                              </span>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                            <span className="text-slate-400 dark:text-slate-500 text-xs flex-shrink-0">
+                              {expandedEventIndex === index ? '▼' : '▶'}
+                            </span>
+                          </button>
+
+                          {expandedEventIndex === index && (
+                            <div className="px-2 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950">
+                              <div className="space-y-2">
+                                {/* Timestamp */}
+                                <div>
+                                  <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                                    Time
+                                  </h4>
+                                  <p className="text-xs font-mono text-slate-800 dark:text-slate-200">
+                                    {(() => {
+                                      const date = new Date(event.timestamp);
+                                      return date.toLocaleTimeString('en-US', { 
+                                        hour12: false, 
+                                        hour: '2-digit', 
+                                        minute: '2-digit', 
+                                        second: '2-digit'
+                                      }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
+                                    })()}
+                                  </p>
+                                </div>
+
+                                {/* Payload */}
+                                {event.payload && Object.keys(event.payload).length > 0 && (
+                                  <div>
+                                    <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                                      Payload
+                                    </h4>
+                                    <pre className="text-xs bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-700 overflow-x-auto font-mono text-slate-800 dark:text-slate-200">
+                                      {JSON.stringify(event.payload, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+
+                                {/* Resulting State */}
+                                {event.resultingState && (
+                                  <div>
+                                    <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                                      State
+                                    </h4>
+                                    <pre className="text-xs bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-700 overflow-x-auto font-mono text-slate-800 dark:text-slate-200">
+                                      {JSON.stringify(event.resultingState, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
