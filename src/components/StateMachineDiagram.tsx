@@ -7,6 +7,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import PayloadModal from './PayloadModal';
 import ContextMenu from './ContextMenu';
 import EventListMenu from './EventListMenu';
+import type { EventLogEntry } from './EventLog';
 
 // Register dagre layout
 cytoscape.use(dagre);
@@ -15,6 +16,7 @@ interface StateMachineDiagramProps {
   config: StateMachineConfig<any, any>;
   activeStates: Set<string>;
   context: any;
+  eventLog: EventLogEntry[];
   onEventClick: (eventType: string, payload?: any) => void;
   onReset: () => void;
   onRewind: (steps: number) => void;
@@ -25,6 +27,7 @@ interface StateMachineDiagramProps {
   historyLength: number;
   isHalted: boolean;
   onShowToast: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  onClearLog: () => void;
 }
 
 type ModalMode = 'payload' | 'custom';
@@ -33,6 +36,7 @@ export default function StateMachineDiagram({
   config, 
   activeStates,
   context,
+  eventLog,
   onEventClick,
   onReset,
   onRewind,
@@ -43,6 +47,7 @@ export default function StateMachineDiagram({
   historyLength,
   isHalted,
   onShowToast,
+  onClearLog,
 }: StateMachineDiagramProps) {
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -55,6 +60,8 @@ export default function StateMachineDiagram({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; eventType: string } | null>(null);
   const [nodeContextMenu, setNodeContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showContextOverlay, setShowContextOverlay] = useState(true);
+  const [showEventLogOverlay, setShowEventLogOverlay] = useState(true);
+  const [expandedEventIndex, setExpandedEventIndex] = useState<number | null>(null);
 
   // Extract all available events from config (including non-transition events)
   const availableEvents = useMemo(() => {
@@ -572,7 +579,7 @@ export default function StateMachineDiagram({
             }`}
           />
           
-          {/* Context Overlay - positioned over the diagram */}
+          {/* Context Overlay - positioned over the diagram (right side) */}
           {showContextOverlay ? (
             <div className="absolute top-4 right-4 z-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-w-sm max-h-[calc(100%-2rem)] overflow-hidden flex flex-col pointer-events-auto">
               <div className="sticky top-0 bg-slate-100 dark:bg-slate-700 px-3 py-2 border-b border-slate-300 dark:border-slate-600 flex justify-between items-center">
@@ -598,6 +605,130 @@ export default function StateMachineDiagram({
               title="Show context"
             >
               Show Context
+            </button>
+          )}
+
+          {/* Event Log Overlay - positioned over the diagram (left side) */}
+          {showEventLogOverlay ? (
+            <div className="absolute top-4 left-4 z-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-lg w-80 max-h-[calc(100%-2rem)] overflow-hidden flex flex-col pointer-events-auto">
+              <div className="sticky top-0 bg-slate-100 dark:bg-slate-700 px-3 py-2 border-b border-slate-300 dark:border-slate-600 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Event Log</h3>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">
+                    {eventLog.length}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {eventLog.length > 0 && (
+                    <button
+                      onClick={onClearLog}
+                      className="text-xs px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded font-semibold transition"
+                      title="Clear log"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowEventLogOverlay(false)}
+                    className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition"
+                    title="Hide event log"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-auto flex-1 p-2">
+                {eventLog.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400">
+                    <div className="text-center text-xs">
+                      <div className="text-2xl mb-1">📋</div>
+                      <p>No events yet</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {eventLog.map((event, index) => (
+                      <div
+                        key={index}
+                        className="bg-white dark:bg-slate-900 rounded border border-slate-300 dark:border-slate-700 overflow-hidden"
+                      >
+                        <button
+                          onClick={() => setExpandedEventIndex(expandedEventIndex === index ? null : index)}
+                          className="w-full px-2 py-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className="font-mono text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded font-bold flex-shrink-0">
+                              #{event.seq}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+                              {event.type}
+                            </span>
+                          </div>
+                          <span className="text-slate-400 dark:text-slate-500 text-xs flex-shrink-0">
+                            {expandedEventIndex === index ? '▼' : '▶'}
+                          </span>
+                        </button>
+
+                        {expandedEventIndex === index && (
+                          <div className="px-2 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950">
+                            <div className="space-y-2">
+                              {/* Timestamp */}
+                              <div>
+                                <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                                  Time
+                                </h4>
+                                <p className="text-xs font-mono text-slate-800 dark:text-slate-200">
+                                  {(() => {
+                                    const date = new Date(event.timestamp);
+                                    return date.toLocaleTimeString('en-US', { 
+                                      hour12: false, 
+                                      hour: '2-digit', 
+                                      minute: '2-digit', 
+                                      second: '2-digit'
+                                    }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
+                                  })()}
+                                </p>
+                              </div>
+
+                              {/* Payload */}
+                              {event.payload && Object.keys(event.payload).length > 0 && (
+                                <div>
+                                  <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                                    Payload
+                                  </h4>
+                                  <pre className="text-xs bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-700 overflow-x-auto font-mono text-slate-800 dark:text-slate-200">
+                                    {JSON.stringify(event.payload, null, 2)}
+                                  </pre>
+                                </div>
+                              )}
+
+                              {/* Resulting State */}
+                              {event.resultingState && (
+                                <div>
+                                  <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                                    State
+                                  </h4>
+                                  <pre className="text-xs bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-700 overflow-x-auto font-mono text-slate-800 dark:text-slate-200">
+                                    {JSON.stringify(event.resultingState, null, 2)}
+                                  </pre>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowEventLogOverlay(true)}
+              className="absolute top-4 left-4 z-10 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-lg text-xs font-bold text-slate-900 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600 transition pointer-events-auto"
+              title="Show event log"
+            >
+              Show Event Log
             </button>
           )}
         </div>

@@ -380,6 +380,7 @@ function App() {
             config={config}
             activeStates={activeStates}
             context={machine.getContext()}
+            eventLog={eventLog}
             onEventClick={handleSendEvent}
             onReset={handleReset}
             onRewind={handleRewind}
@@ -390,6 +391,7 @@ function App() {
             historyLength={machine.getHistoryLength()}
             isHalted={machine.isHalted()}
             onShowToast={(message, type) => setToast({ message, type })}
+            onClearLog={handleClearLog}
           />
         )}
       </div>
