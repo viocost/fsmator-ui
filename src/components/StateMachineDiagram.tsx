@@ -250,6 +250,16 @@ export default function StateMachineDiagram({
           },
         },
         {
+          selector: 'edge[isAlways]',
+          style: {
+            'line-style': 'dashed',
+            'line-dash-pattern': [6, 3],
+            'width': 2.5,
+            'line-color': isDark ? '#8b5cf6' : '#7c3aed',
+            'target-arrow-color': isDark ? '#8b5cf6' : '#7c3aed',
+          },
+        },
+        {
           selector: 'node.halted',
           style: {
             'background-color': '#f97316',
@@ -274,7 +284,8 @@ export default function StateMachineDiagram({
       const edge = evt.target;
       const edgeData = edge.data();
 
-      if (edgeData.eventType && !edgeData.isStartEdge) {
+      // Only allow clicking on edges with event types (not always transitions or start edges)
+      if (edgeData.eventType && !edgeData.isStartEdge && !edgeData.isAlways) {
         // Left click: send event directly
         onEventClick(edgeData.eventType);
       }
@@ -289,7 +300,8 @@ export default function StateMachineDiagram({
       const edge = evt.target;
       const edgeData = edge.data();
 
-      if (edgeData.eventType && !edgeData.isStartEdge) {
+      // Only show context menu for edges with event types (not always transitions or start edges)
+      if (edgeData.eventType && !edgeData.isStartEdge && !edgeData.isAlways) {
         const position = evt.renderedPosition || evt.position;
         setContextMenu({
           x: position.x,
@@ -579,6 +591,16 @@ export default function StateMachineDiagram({
               <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
                 <div className="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-800 border-2 border-slate-500 dark:border-slate-600"></div>
                 <span>Start</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <svg width="20" height="4" className="flex-shrink-0">
+                  <line x1="0" y1="2" x2="20" y2="2" stroke="#7c3aed" strokeWidth="2" strokeDasharray="4,2" />
+                </svg>
+                <span>Always</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <span>🛡</span>
+                <span>Guard</span>
               </div>
             </div>
 
@@ -898,34 +920,87 @@ function buildElements(config: StateMachineConfig<any, any>) {
       });
     }
 
+    // Process 'always' transitions (automatic transitions)
+    if (stateConfig.always) {
+      const alwaysTransitions = Array.isArray(stateConfig.always) 
+        ? stateConfig.always 
+        : [stateConfig.always];
+
+      alwaysTransitions.forEach((transition, index) => {
+        const transitionConfig = typeof transition === 'string'
+          ? { target: transition }
+          : transition;
+
+        if (transitionConfig && typeof transitionConfig === 'object' && transitionConfig.target) {
+          const fullTargetId = resolveTargetPath(transitionConfig.target, fullStateId);
+
+          // Only create edge if target exists
+          if (stateRegistry.has(fullTargetId)) {
+            const guards = transitionConfig.guard 
+              ? Array.isArray(transitionConfig.guard) 
+                ? transitionConfig.guard 
+                : [transitionConfig.guard]
+              : [];
+            
+            const guardLabel = guards.length > 0 ? ` [🛡 ${guards.join(', ')}]` : '';
+            const label = `always${guardLabel}`;
+
+            elements.push({
+              data: {
+                id: `${fullStateId}_to_${fullTargetId}_always_${index}`,
+                source: fullStateId,
+                target: fullTargetId,
+                label,
+                eventType: null, // Always transitions don't have event types
+                isAlways: true,
+                guards,
+              },
+            });
+          }
+        }
+      });
+    }
+
     // Process transitions
     if (stateConfig.on) {
       for (const [eventType, transition] of Object.entries(stateConfig.on)) {
-        const transitionConfig = typeof transition === 'string'
-          ? { target: transition }
-          : Array.isArray(transition)
-            ? transition[0]
-            : transition;
+        const transitions = Array.isArray(transition) ? transition : [transition];
 
-        if (transitionConfig && typeof transitionConfig === 'object') {
-          const target = transitionConfig.target;
-          if (target) {
-            const fullTargetId = resolveTargetPath(target, fullStateId);
+        transitions.forEach((trans, index) => {
+          const transitionConfig = typeof trans === 'string'
+            ? { target: trans }
+            : trans;
 
-            // Only create edge if target exists
-            if (stateRegistry.has(fullTargetId)) {
-              elements.push({
-                data: {
-                  id: `${fullStateId}_to_${fullTargetId}_on_${eventType}`,
-                  source: fullStateId,
-                  target: fullTargetId,
-                  label: eventType,
-                  eventType,
-                },
-              });
+          if (transitionConfig && typeof transitionConfig === 'object') {
+            const target = transitionConfig.target;
+            if (target) {
+              const fullTargetId = resolveTargetPath(target, fullStateId);
+
+              // Only create edge if target exists
+              if (stateRegistry.has(fullTargetId)) {
+                const guards = transitionConfig.guard 
+                  ? Array.isArray(transitionConfig.guard) 
+                    ? transitionConfig.guard 
+                    : [transitionConfig.guard]
+                  : [];
+                
+                const guardLabel = guards.length > 0 ? ` [🛡 ${guards.join(', ')}]` : '';
+                const label = `${eventType}${guardLabel}`;
+
+                elements.push({
+                  data: {
+                    id: `${fullStateId}_to_${fullTargetId}_on_${eventType}_${index}`,
+                    source: fullStateId,
+                    target: fullTargetId,
+                    label,
+                    eventType,
+                    guards,
+                  },
+                });
+              }
             }
           }
-        }
+        });
       }
     }
 
