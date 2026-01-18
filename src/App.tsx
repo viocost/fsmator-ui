@@ -6,6 +6,7 @@ import StateDisplay from '@/components/StateDisplay';
 import EventControls from '@/components/EventControls';
 import EventLog, { type EventLogEntry } from '@/components/EventLog';
 import Toast from '@/components/Toast';
+import Footer from '@/components/Footer';
 import { examples } from '@/examples';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -487,11 +488,7 @@ function App() {
       )}
 
       {/* Footer */}
-      <footer className="mt-12 py-6 px-8 bg-slate-100 dark:bg-slate-900 border-t border-slate-300 dark:border-slate-800 text-center text-slate-600 dark:text-slate-500 text-sm">
-        <p>
-          Built with React, TypeScript, Cytoscape.js, and the state-reducer library
-        </p>
-      </footer>
+      <Footer />
     </div>
   );
 }
