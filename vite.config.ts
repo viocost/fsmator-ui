@@ -3,12 +3,12 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  base: '/fsmator-ui/',
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/fsmator-ui/' : '/',
   plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
-})
+}))
