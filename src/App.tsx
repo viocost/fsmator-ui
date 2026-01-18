@@ -209,6 +209,7 @@ function App() {
   const canForward = machine ? machine.getHistoryIndex() < machine.getHistoryLength() - 1 : false;
 
   const handleReset = useCallback(() => {
+    setIsPlaying(false);
     loadConfiguration();
   }, [loadConfiguration]);
 
@@ -259,10 +260,13 @@ function App() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent mb-2">
-                State Machine Simulator
+                FSMator UI 0.0.1
               </h1>
               <p className="text-slate-600 dark:text-slate-400 text-sm">
-                Interactive state machine visualization and testing tool
+                Visual State Machine Simulator
+              </p>
+              <p className="text-slate-600 dark:text-slate-400 text-xs mt-1">
+                Powered by <a href="https://github.com/viocost/fsmator" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline">FSMator 0.2.0</a>
               </p>
             </div>
             
