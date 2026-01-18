@@ -208,16 +208,16 @@ export default function StateMachineDiagram({
       {
         selector: 'node.highlighted',
         style: {
-          'background-color': '#f59e0b',
-          'border-color': '#d97706',
+          'background-color': '#06b6d4', // Cyan - distinct from halted
+          'border-color': '#0891b2',
           'border-width': 4,
         },
       },
       {
         selector: 'edge.highlighted',
         style: {
-          'line-color': '#f59e0b',
-          'target-arrow-color': '#f59e0b',
+          'line-color': '#06b6d4', // Cyan
+          'target-arrow-color': '#06b6d4',
           'width': 3,
         },
       },
@@ -254,8 +254,8 @@ export default function StateMachineDiagram({
       {
         selector: 'node.halted',
         style: {
-          'background-color': '#f97316',
-          'border-color': '#ea580c',
+          'background-color': '#a855f7', // Purple - positive, completion color
+          'border-color': '#9333ea',
           'border-width': 4,
         },
       },
@@ -528,8 +528,8 @@ export default function StateMachineDiagram({
 
             {/* Halted indicator */}
             {isHalted && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-orange-500 text-white rounded-lg font-semibold text-sm">
-                <span>⚠</span>
+              <div className="flex items-center gap-2 px-3 py-1 bg-purple-500 text-white rounded-lg font-semibold text-sm">
+                <span>✓</span>
                 <span>State Machine Halted</span>
               </div>
             )}
@@ -613,7 +613,11 @@ export default function StateMachineDiagram({
                 <span>Active</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-                <div className="w-4 h-4 rounded bg-orange-500 border-2 border-orange-600"></div>
+                <div className="w-4 h-4 rounded bg-cyan-500 border-2 border-cyan-600"></div>
+                <span>Selected</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <div className="w-4 h-4 rounded bg-purple-500 border-2 border-purple-600"></div>
                 <span>Halted</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
