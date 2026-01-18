@@ -311,11 +311,15 @@ export default function StateMachineDiagram({
       // Only show context menu for edges with event types (not always transitions or start edges)
       if (edgeData.eventType && !edgeData.isStartEdge && !edgeData.isAlways) {
         const position = evt.renderedPosition || evt.position;
-        setContextMenu({
-          x: position.x,
-          y: position.y,
-          eventType: edgeData.eventType,
-        });
+        const container = containerRef.current;
+        if (container) {
+          // Use canvas-relative coordinates since menu is now absolutely positioned within the wrapper
+          setContextMenu({
+            x: position.x,
+            y: position.y,
+            eventType: edgeData.eventType,
+          });
+        }
       }
 
       // Highlight
@@ -341,10 +345,14 @@ export default function StateMachineDiagram({
       }
 
       const position = evt.renderedPosition || evt.position;
-      setNodeContextMenu({
-        x: position.x,
-        y: position.y,
-      });
+      const container = containerRef.current;
+      if (container) {
+        // Use canvas-relative coordinates since menu is now absolutely positioned within the wrapper
+        setNodeContextMenu({
+          x: position.x,
+          y: position.y,
+        });
+      }
 
       // Highlight
       cyRef.current?.elements().removeClass('highlighted');
@@ -509,25 +517,6 @@ export default function StateMachineDiagram({
         onClose={handleCloseModal}
       />
 
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          onSendWithPayload={handleSendWithPayload}
-          onClose={() => setContextMenu(null)}
-        />
-      )}
-
-      {nodeContextMenu && (
-        <EventListMenu
-          x={nodeContextMenu.x}
-          y={nodeContextMenu.y}
-          events={availableEvents}
-          onEventSelect={handleNodeEventSelect}
-          onClose={() => setNodeContextMenu(null)}
-        />
-      )}
-
       <div
         ref={wrapperRef}
         className={`bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl p-4 ${isFullscreen ? 'bg-white dark:bg-slate-950' : ''
@@ -682,6 +671,26 @@ export default function StateMachineDiagram({
             className={`bg-white dark:bg-slate-900 rounded border-2 border-slate-300 dark:border-slate-700 ${isFullscreen ? 'h-[calc(100vh-6rem)] flex-1' : 'h-[600px]'
               }`}
           />
+
+          {/* Context menus - positioned within wrapper for fullscreen support */}
+          {contextMenu && (
+            <ContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              onSendWithPayload={handleSendWithPayload}
+              onClose={() => setContextMenu(null)}
+            />
+          )}
+
+          {nodeContextMenu && (
+            <EventListMenu
+              x={nodeContextMenu.x}
+              y={nodeContextMenu.y}
+              events={availableEvents}
+              onEventSelect={handleNodeEventSelect}
+              onClose={() => setNodeContextMenu(null)}
+            />
+          )}
 
           {/* Context Overlay - positioned over the diagram (right side) */}
           {showContextOverlay ? (

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface ContextMenuProps {
   x: number;
@@ -9,6 +9,50 @@ interface ContextMenuProps {
 
 export default function ContextMenu({ x, y, onSendWithPayload, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ x, y });
+
+  useEffect(() => {
+    // Adjust position to keep menu in viewport
+    if (menuRef.current) {
+      const menuRect = menuRef.current.getBoundingClientRect();
+      const parentElement = menuRef.current.parentElement;
+      
+      if (!parentElement) return;
+      
+      const parentRect = parentElement.getBoundingClientRect();
+      const parentWidth = parentRect.width;
+      const parentHeight = parentRect.height;
+
+      let adjustedX = x;
+      let adjustedY = y;
+
+      // Add slight offset to appear next to cursor
+      adjustedX += 5;
+      adjustedY += 5;
+
+      // Check right boundary (relative to parent)
+      if (adjustedX + menuRect.width > parentWidth) {
+        adjustedX = Math.max(10, parentWidth - menuRect.width - 10);
+      }
+
+      // Check bottom boundary (relative to parent)
+      if (adjustedY + menuRect.height > parentHeight) {
+        adjustedY = Math.max(10, parentHeight - menuRect.height - 10);
+      }
+
+      // Check left boundary
+      if (adjustedX < 10) {
+        adjustedX = 10;
+      }
+
+      // Check top boundary
+      if (adjustedY < 10) {
+        adjustedY = 10;
+      }
+
+      setPosition({ x: adjustedX, y: adjustedY });
+    }
+  }, [x, y]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -35,8 +79,8 @@ export default function ContextMenu({ x, y, onSendWithPayload, onClose }: Contex
   return (
     <div
       ref={menuRef}
-      className="fixed z-[100] bg-white dark:bg-slate-800 rounded-lg shadow-2xl border border-slate-300 dark:border-slate-600 py-1 min-w-[200px]"
-      style={{ left: x, top: y }}
+      className="absolute z-[100] bg-white dark:bg-slate-800 rounded-lg shadow-2xl border border-slate-300 dark:border-slate-600 py-1 min-w-[200px]"
+      style={{ left: position.x, top: position.y }}
     >
       <button
         onClick={() => {
