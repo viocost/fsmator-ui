@@ -5,16 +5,34 @@ import { examples } from '@/examples';
 interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
+  onApply: () => void;
+  hasUnsavedChanges: boolean;
   onLoadExample?: (exampleName: keyof typeof examples) => void;
 }
 
-export default function CodeEditor({ value, onChange, onLoadExample }: CodeEditorProps) {
+export default function CodeEditor({ value, onChange, onApply, hasUnsavedChanges, onLoadExample }: CodeEditorProps) {
   const { theme } = useTheme();
   
   return (
     <div className="bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl p-4">
       <div className="flex justify-between items-start mb-4">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Configuration Editor</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Configuration Editor</h2>
+          <button
+            onClick={onApply}
+            disabled={!hasUnsavedChanges}
+            className="px-3 py-1 bg-green-600 hover:bg-green-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded text-xs font-semibold transition"
+            title="Apply changes and reload machine"
+          >
+            Apply
+          </button>
+          {hasUnsavedChanges && (
+            <span className="text-xs text-orange-600 dark:text-orange-400 font-semibold flex items-center gap-1">
+              <span className="inline-block w-2 h-2 bg-orange-600 dark:bg-orange-400 rounded-full"></span>
+              Unsaved changes
+            </span>
+          )}
+        </div>
         
         {/* Example Selector Buttons */}
         {onLoadExample && (

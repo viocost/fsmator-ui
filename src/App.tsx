@@ -15,6 +15,7 @@ type Tab = 'controls' | 'editor' | 'diagram';
 function App() {
   const { theme, toggleTheme } = useTheme();
   const [code, setCode] = useState(examples.counter);
+  const [loadedCode, setLoadedCode] = useState(examples.counter); // Track what's currently loaded
   const [machine, setMachine] = useState<StateMachine<any, any> | null>(null);
   const [config, setConfig] = useState<StateMachineConfig<any, any> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +26,9 @@ function App() {
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = code !== loadedCode;
 
   // Auto-load counter example on first mount
   useEffect(() => {
@@ -73,7 +77,7 @@ function App() {
       // Evaluate the code to get the config
       // Using eval instead of Function constructor to support the wrapped object literal syntax
       const loadedConfig = eval(code);
-
+      
       // Validate config has required fields
       if (!loadedConfig || typeof loadedConfig !== 'object') {
         throw new Error('Configuration must be an object');
@@ -87,7 +91,7 @@ function App() {
       if (!loadedConfig.states) {
         throw new Error('Configuration must have states property');
       }
-
+      
       // Create and start the machine
       const newMachine = new StateMachine(loadedConfig).start();
       setMachine(newMachine);
@@ -96,6 +100,8 @@ function App() {
       setError(null);
       setEventLog([]);
       setEventSeq(0);
+      setLoadedCode(code); // Mark current code as loaded
+      setToast({ message: 'Configuration applied successfully', type: 'success' });
     } catch (err: any) {
       setError(err.message || 'Failed to load configuration');
       setMachine(null);
@@ -113,29 +119,50 @@ function App() {
   const handleSendEvent = useCallback((eventType: string, payload?: any) => {
     if (!machine) return;
 
-
     try {
       const event = payload || { type: eventType };
-
+      
       console.log('Sending event to machine:', event);
+      
+      // Check if we're in the middle of history
+      const currentIndex = machine.getHistoryIndex();
+      const maxIndex = machine.getHistoryLength() - 1;
+      const isInMiddleOfHistory = currentIndex < maxIndex;
+      
       machine.send(event);
-
+      
       const newSeq = eventSeq + 1;
       const resultingState = {
         value: machine.getStateValue(),
         context: machine.getContext(),
       };
-
-      // Add to event log
-      setEventLog(prev => [...prev, {
-        seq: newSeq,
-        type: eventType,
-        payload: event,
-        timestamp: Date.now(),
-        resultingState,
-      }]);
+      
+      // If we're in the middle of history, truncate the log to current position
+      // then add the new event
+      setEventLog(prev => {
+        if (isInMiddleOfHistory) {
+          // Truncate to current position (currentIndex is 0-based, eventLog uses 1-based seq)
+          const truncated = prev.slice(0, currentIndex);
+          return [...truncated, {
+            seq: newSeq,
+            type: eventType,
+            payload: event,
+            timestamp: Date.now(),
+            resultingState,
+          }];
+        } else {
+          // Normal append at the end
+          return [...prev, {
+            seq: newSeq,
+            type: eventType,
+            payload: event,
+            timestamp: Date.now(),
+            resultingState,
+          }];
+        }
+      });
       setEventSeq(newSeq);
-
+      
       setActiveStates(new Set(machine.getActiveStateNodes()));
       setError(null);
     } catch (err: any) {
@@ -223,11 +250,11 @@ function App() {
 
   const loadExample = useCallback((exampleKey: keyof typeof examples) => {
     setCode(examples[exampleKey]);
-
+    
     // Auto-load the example immediately
     try {
       const loadedConfig = eval(examples[exampleKey]);
-
+      
       if (!loadedConfig || typeof loadedConfig !== 'object') {
         throw new Error('Configuration must be an object');
       }
@@ -240,7 +267,7 @@ function App() {
       if (!loadedConfig.states) {
         throw new Error('Configuration must have states property');
       }
-
+      
       const newMachine = new StateMachine(loadedConfig).start();
       setMachine(newMachine);
       setConfig(loadedConfig);
@@ -248,6 +275,7 @@ function App() {
       setError(null);
       setEventLog([]);
       setEventSeq(0);
+      setLoadedCode(examples[exampleKey]); // Mark example as loaded
     } catch (err: any) {
       setError(err.message || 'Failed to load configuration');
       setMachine(null);
@@ -436,15 +464,15 @@ function App() {
 
         {activeTab === 'editor' && (
           <div className="space-y-6">
-            <CodeEditor value={code} onChange={setCode} onLoadExample={loadExample} />
-
+            <CodeEditor 
+              value={code} 
+              onChange={setCode} 
+              onApply={loadConfiguration}
+              hasUnsavedChanges={hasUnsavedChanges}
+              onLoadExample={loadExample} 
+            />
+            
             <div className="flex gap-3">
-              <button
-                onClick={loadConfiguration}
-                className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-lg transition shadow-lg"
-              >
-                Load & Start Machine
-              </button>
               <button
                 onClick={handleReset}
                 disabled={!machine}

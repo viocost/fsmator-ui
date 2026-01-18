@@ -18,10 +18,10 @@ export default function PayloadModal({ isOpen, eventType, mode, onSend, onClose 
   useEffect(() => {
     if (isOpen) {
       if (mode === 'payload') {
-        // Payload mode: just the payload object
+        // Payload mode: just the payload object (formatted)
         setPayloadText('{}');
       } else {
-        // Custom mode: full event with type
+        // Custom mode: full event with type (formatted)
         setPayloadText(`{\n  "type": "${eventType}"\n}`);
       }
       setError(null);
@@ -87,6 +87,33 @@ export default function PayloadModal({ isOpen, eventType, mode, onSend, onClose 
     }
   };
 
+  const handleFormat = () => {
+    try {
+      const parsed = JSON.parse(payloadText);
+      const formatted = JSON.stringify(parsed, null, 2);
+      setPayloadText(formatted);
+      setError(null);
+      setErrorLine(null);
+    } catch (e: any) {
+      // Keep validation error
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    // Try to auto-format pasted JSON
+    const pasted = e.clipboardData.getData('text');
+    try {
+      const parsed = JSON.parse(pasted);
+      const formatted = JSON.stringify(parsed, null, 2);
+      e.preventDefault();
+      setPayloadText(formatted);
+      setError(null);
+      setErrorLine(null);
+    } catch {
+      // If not valid JSON, let default paste behavior happen
+    }
+  };
+
   if (!isOpen) return null;
 
   const lines = payloadText.split('\n');
@@ -120,9 +147,18 @@ export default function PayloadModal({ isOpen, eventType, mode, onSend, onClose 
 
         {/* Body */}
         <div className="p-6">
-          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-            {mode === 'payload' ? 'Payload Object (JSON):' : 'Full Event (JSON):'}
-          </label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {mode === 'payload' ? 'Payload Object (JSON):' : 'Full Event (JSON):'}
+            </label>
+            <button
+              onClick={handleFormat}
+              className="px-3 py-1 text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded font-semibold transition"
+              title="Format JSON (Ctrl/Cmd + Shift + F)"
+            >
+              Format JSON
+            </button>
+          </div>
           
           <div className="relative">
             {/* Line numbers */}
@@ -142,6 +178,7 @@ export default function PayloadModal({ isOpen, eventType, mode, onSend, onClose 
               value={payloadText}
               onChange={(e) => validateAndHighlightJSON(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               className={`w-full pl-14 pr-4 py-3 bg-white dark:bg-slate-900 border-2 rounded font-mono text-sm h-64 resize-none focus:outline-none focus:ring-2 ${
                 error
                   ? 'border-red-500 focus:ring-red-500 text-red-700 dark:text-red-300'

@@ -6,9 +6,15 @@ export const examples = {
   timeTravel: true,
   
   reducers: {
-    increment: ({ context }) => ({ count: context.count + 1 }),
-    decrement: ({ context }) => ({ count: context.count - 1 }),
-    reset: () => ({ count: 0 }),
+    increment: ({ context }) => {
+      return { count: context.count + 1 };
+    },
+    decrement: ({ context }) => {
+      return { count: context.count - 1 };
+    },
+    reset: () => {
+      return { count: 0 };
+    },
   },
   
   states: {
@@ -32,10 +38,12 @@ export const examples = {
   timeTravel: true,
   
   reducers: {
-    incrementCycle: ({ context }) => ({ 
-      cycleCount: context.cycleCount + 1,
-      timestamp: Date.now()
-    }),
+    incrementCycle: ({ context }) => {
+      return { 
+        cycleCount: context.cycleCount + 1,
+        timestamp: Date.now()
+      };
+    },
   },
   
   states: {
@@ -74,18 +82,24 @@ export const examples = {
   },
   
   reducers: {
-    incrementAttempts: ({ context }) => ({ 
-      submitAttempts: context.submitAttempts + 1 
-    }),
-    setErrors: ({ context, event }) => ({
-      errors: event.payload?.errors || ['Validation failed']
-    }),
-    clearErrors: () => ({ errors: [] }),
+    incrementAttempts: ({ context }) => {
+      return { 
+        submitAttempts: context.submitAttempts + 1 
+      };
+    },
+    setErrors: ({ context, event }) => {
+      return {
+        errors: event.payload?.errors || ['Validation failed']
+      };
+    },
+    clearErrors: () => {
+      return { errors: [] };
+    },
     updateForm: ({ context, event }) => {
       console.log('Updating form with:', event.payload);
       return {
         formData: { ...context.formData, ...event.payload }
-      }
+      };
    },
   },
   
@@ -142,21 +156,37 @@ export const examples = {
   timeTravel: true,
   
   reducers: {
-    powerOn: () => ({ isPoweredOn: true }),
-    powerOff: () => ({ 
-      isPoweredOn: false, 
-      isPlaying: false 
-    }),
-    play: () => ({ isPlaying: true }),
-    pause: () => ({ isPlaying: false }),
-    volumeUp: ({ context }) => ({ 
-      volume: Math.min(100, context.volume + 10) 
-    }),
-    volumeDown: ({ context }) => ({ 
-      volume: Math.max(0, context.volume - 10) 
-    }),
-    mute: () => ({ volume: 0 }),
-    unmute: () => ({ volume: 50 }),
+    powerOn: () => {
+      return { isPoweredOn: true };
+    },
+    powerOff: () => {
+      return { 
+        isPoweredOn: false, 
+        isPlaying: false 
+      };
+    },
+    play: () => {
+      return { isPlaying: true };
+    },
+    pause: () => {
+      return { isPlaying: false };
+    },
+    volumeUp: ({ context }) => {
+      return { 
+        volume: Math.min(100, context.volume + 10) 
+      };
+    },
+    volumeDown: ({ context }) => {
+      return { 
+        volume: Math.max(0, context.volume - 10) 
+      };
+    },
+    mute: () => {
+      return { volume: 0 };
+    },
+    unmute: () => {
+      return { volume: 50 };
+    },
   },
   
   states: {
