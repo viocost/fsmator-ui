@@ -63,6 +63,7 @@ export default function StateMachineDiagram({
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
+  const onEventClickRef = useRef(onEventClick);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>('payload');
@@ -117,14 +118,13 @@ export default function StateMachineDiagram({
     };
   }, []);
 
-  // Note: We don't prevent contextmenu here because Cytoscape needs to detect it
-  // for cxttap events. The prevention happens in Cytoscape's event handlers.
-
+  // Keep callback ref updated
   useEffect(() => {
-    if (!containerRef.current) return;
+    onEventClickRef.current = onEventClick;
+  }, [onEventClick]);
 
-    // Theme-aware colors
-    const isDark = theme === 'dark';
+  // Helper function to get theme-aware style
+  const getStylesheet = (isDark: boolean): any => {
     const nodeColor = isDark ? '#3b82f6' : '#2563eb';
     const nodeBorder = isDark ? '#2563eb' : '#1d4ed8';
     const edgeColor = isDark ? '#64748b' : '#94a3b8';
@@ -134,7 +134,139 @@ export default function StateMachineDiagram({
     const parentBorder = isDark ? '#475569' : '#94a3b8';
     const parentText = isDark ? '#cbd5e1' : '#475569';
 
-    // Build cytoscape elements from config
+    return [
+      {
+        selector: 'node',
+        style: {
+          'background-color': nodeColor,
+          'label': 'data(label)',
+          'color': '#fff',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-weight': 'bold',
+          'text-wrap': 'wrap',
+          'text-max-width': '100px',
+          'font-size': '10px',
+          'width': 140,
+          'height': 80,
+          'border-width': 3,
+          'border-color': nodeBorder,
+        },
+      },
+      {
+        selector: 'edge',
+        style: {
+          'width': 2,
+          'line-color': edgeColor,
+          'target-arrow-color': edgeColor,
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          'arrow-scale': 1,
+          'label': 'data(label)',
+          'font-size': '9px',
+          'text-wrap': 'wrap',
+          'text-max-width': '120px',
+          'text-margin-y': '-8' as any,
+          'text-background-color': textBgColor,
+          'text-background-opacity': 0.95,
+          'text-background-padding': '3px',
+          'color': textColor,
+        },
+      },
+      {
+        selector: 'node:parent',
+        style: {
+          'background-opacity': 0.15,
+          'background-color': parentBg,
+          'border-color': parentBorder,
+          'border-width': 2,
+          'text-valign': 'top',
+          'text-halign': 'center',
+          'font-weight': 'bold',
+          'color': parentText,
+          'font-size': '11px',
+          'padding': '20' as any,
+        },
+      },
+      {
+        selector: 'node.active',
+        style: {
+          'background-color': '#10b981',
+          'border-color': '#059669',
+          'border-width': 4,
+        },
+      },
+      {
+        selector: 'node:parent.active',
+        style: {
+          'background-color': '#10b981',
+          'background-opacity': 0.2,
+          'border-color': '#059669',
+          'border-width': 3,
+        },
+      },
+      {
+        selector: 'node.highlighted',
+        style: {
+          'background-color': '#f59e0b',
+          'border-color': '#d97706',
+          'border-width': 4,
+        },
+      },
+      {
+        selector: 'edge.highlighted',
+        style: {
+          'line-color': '#f59e0b',
+          'target-arrow-color': '#f59e0b',
+          'width': 3,
+        },
+      },
+      {
+        selector: 'node[isStartNode]',
+        style: {
+          'background-color': isDark ? '#1e293b' : '#cbd5e1',
+          'width': 20,
+          'height': 20,
+          'shape': 'ellipse',
+          'label': '',
+          'border-width': 2,
+          'border-color': isDark ? '#475569' : '#94a3b8',
+        },
+      },
+      {
+        selector: 'edge[isStartEdge]',
+        style: {
+          'width': 3,
+          'line-color': isDark ? '#475569' : '#94a3b8',
+          'target-arrow-color': isDark ? '#475569' : '#94a3b8',
+        },
+      },
+      {
+        selector: 'edge[isAlways]',
+        style: {
+          'line-style': 'dashed',
+          'line-dash-pattern': [6, 3],
+          'width': 2.5,
+          'line-color': isDark ? '#8b5cf6' : '#7c3aed',
+          'target-arrow-color': isDark ? '#8b5cf6' : '#7c3aed',
+        },
+      },
+      {
+        selector: 'node.halted',
+        style: {
+          'background-color': '#f97316',
+          'border-color': '#ea580c',
+          'border-width': 4,
+        },
+      },
+    ];
+  };
+
+  // Create cytoscape instance once on mount
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const isDark = theme === 'dark';
     const elements = buildElements(config);
 
     // Create cytoscape instance
@@ -142,132 +274,7 @@ export default function StateMachineDiagram({
       container: containerRef.current,
       elements,
       wheelSensitivity: 3.0,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': nodeColor,
-            'label': 'data(label)',
-            'color': '#fff',
-            'text-valign': 'center',
-            'text-halign': 'center',
-            'font-weight': 'bold',
-            'text-wrap': 'wrap',
-            'text-max-width': '100px',
-            'font-size': '10px',
-            'width': 140,
-            'height': 80,
-            'border-width': 3,
-            'border-color': nodeBorder,
-          },
-        },
-        {
-          selector: 'edge',
-          style: {
-            'width': 2,
-            'line-color': edgeColor,
-            'target-arrow-color': edgeColor,
-            'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier',
-            'arrow-scale': 1,
-            'label': 'data(label)',
-            'font-size': '9px',
-            'text-wrap': 'wrap',
-            'text-max-width': '120px',
-            'text-margin-y': '-8' as any,
-            'text-background-color': textBgColor,
-            'text-background-opacity': 0.95,
-            'text-background-padding': '3px',
-            'color': textColor,
-          },
-        },
-        {
-          selector: 'node:parent',
-          style: {
-            'background-opacity': 0.15,
-            'background-color': parentBg,
-            'border-color': parentBorder,
-            'border-width': 2,
-            'text-valign': 'top',
-            'text-halign': 'center',
-            'font-weight': 'bold',
-            'color': parentText,
-            'font-size': '11px',
-            'padding': '20' as any,
-          },
-        },
-        {
-          selector: 'node.active',
-          style: {
-            'background-color': '#10b981',
-            'border-color': '#059669',
-            'border-width': 4,
-          },
-        },
-        {
-          selector: 'node:parent.active',
-          style: {
-            'background-color': '#10b981',
-            'background-opacity': 0.2,
-            'border-color': '#059669',
-            'border-width': 3,
-          },
-        },
-        {
-          selector: 'node.highlighted',
-          style: {
-            'background-color': '#f59e0b',
-            'border-color': '#d97706',
-            'border-width': 4,
-          },
-        },
-        {
-          selector: 'edge.highlighted',
-          style: {
-            'line-color': '#f59e0b',
-            'target-arrow-color': '#f59e0b',
-            'width': 3,
-          },
-        },
-        {
-          selector: 'node[isStartNode]',
-          style: {
-            'background-color': isDark ? '#1e293b' : '#cbd5e1',
-            'width': 20,
-            'height': 20,
-            'shape': 'ellipse',
-            'label': '',
-            'border-width': 2,
-            'border-color': isDark ? '#475569' : '#94a3b8',
-          },
-        },
-        {
-          selector: 'edge[isStartEdge]',
-          style: {
-            'width': 3,
-            'line-color': isDark ? '#475569' : '#94a3b8',
-            'target-arrow-color': isDark ? '#475569' : '#94a3b8',
-          },
-        },
-        {
-          selector: 'edge[isAlways]',
-          style: {
-            'line-style': 'dashed',
-            'line-dash-pattern': [6, 3],
-            'width': 2.5,
-            'line-color': isDark ? '#8b5cf6' : '#7c3aed',
-            'target-arrow-color': isDark ? '#8b5cf6' : '#7c3aed',
-          },
-        },
-        {
-          selector: 'node.halted',
-          style: {
-            'background-color': '#f97316',
-            'border-color': '#ea580c',
-            'border-width': 4,
-          },
-        },
-      ],
+      style: getStylesheet(isDark),
       layout: {
         name: 'dagre',
         rankDir: 'LR',
@@ -287,7 +294,7 @@ export default function StateMachineDiagram({
       // Only allow clicking on edges with event types (not always transitions or start edges)
       if (edgeData.eventType && !edgeData.isStartEdge && !edgeData.isAlways) {
         // Left click: send event directly
-        onEventClick(edgeData.eventType);
+        onEventClickRef.current(edgeData.eventType);
       }
 
       // Highlight
@@ -373,7 +380,37 @@ export default function StateMachineDiagram({
       container.removeEventListener('contextmenu', preventContextMenu);
       cyRef.current?.destroy();
     };
-  }, [config, onEventClick, theme]);
+  }, []); // Only run once on mount
+
+  // Update config when it changes
+  useEffect(() => {
+    if (!cyRef.current) return;
+
+    const elements = buildElements(config);
+    
+    // Replace elements
+    cyRef.current.elements().remove();
+    cyRef.current.add(elements);
+    
+    // Re-run layout
+    cyRef.current.layout({
+      name: 'dagre',
+      rankDir: 'LR',
+      padding: 50,
+      spacingFactor: 1.3,
+      nodeDimensionsIncludeLabels: true,
+      rankSep: 120,
+      edgeSep: 40,
+    } as any).run();
+  }, [config]);
+
+  // Update theme styles when theme changes
+  useEffect(() => {
+    if (!cyRef.current) return;
+    
+    const isDark = theme === 'dark';
+    cyRef.current.style(getStylesheet(isDark));
+  }, [theme]);
 
   // Update active states highlighting
   useEffect(() => {
