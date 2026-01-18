@@ -144,25 +144,34 @@ export const examples = {
   },
 })`,
 
-  parallelMedia: `// Parallel Media Player Example (with Power On/Off)
+  parallelMedia: `// Advanced Parallel Media Player Example
 ({
   initialContext: { 
     volume: 50, 
     isPlaying: false,
     currentTime: 0,
-    isPoweredOn: false
+    isPoweredOn: false,
+    bufferLevel: 100,
+    networkQuality: 'good',
+    subtitlesEnabled: false,
+    quality: 'HD'
   },
   initial: 'off',
   timeTravel: true,
   
   reducers: {
     powerOn: () => {
-      return { isPoweredOn: true };
+      return { 
+        isPoweredOn: true,
+        bufferLevel: 100,
+        networkQuality: 'good'
+      };
     },
     powerOff: () => {
       return { 
         isPoweredOn: false, 
-        isPlaying: false 
+        isPlaying: false,
+        bufferLevel: 0
       };
     },
     play: () => {
@@ -187,6 +196,35 @@ export const examples = {
     unmute: () => {
       return { volume: 50 };
     },
+    startBuffering: ({ context }) => {
+      return { 
+        bufferLevel: Math.max(0, context.bufferLevel - 20) 
+      };
+    },
+    finishBuffering: () => {
+      return { bufferLevel: 100 };
+    },
+    networkDegraded: () => {
+      return { networkQuality: 'poor' };
+    },
+    networkRestored: () => {
+      return { networkQuality: 'good' };
+    },
+    enableSubtitles: () => {
+      return { subtitlesEnabled: true };
+    },
+    disableSubtitles: () => {
+      return { subtitlesEnabled: false };
+    },
+    setSD: () => {
+      return { quality: 'SD' };
+    },
+    setHD: () => {
+      return { quality: 'HD' };
+    },
+    set4K: () => {
+      return { quality: '4K' };
+    },
   },
   
   states: {
@@ -205,6 +243,7 @@ export const examples = {
       },
       
       states: {
+        // Playback control
         playback: {
           initial: 'paused',
           states: {
@@ -221,6 +260,7 @@ export const examples = {
           },
         },
         
+        // Volume control
         volume: {
           initial: 'normal',
           states: {
@@ -234,6 +274,82 @@ export const examples = {
             muted: {
               on: {
                 UNMUTE: { target: 'normal', assign: 'unmute' },
+              },
+            },
+          },
+        },
+        
+        // Buffer status
+        buffer: {
+          initial: 'ready',
+          states: {
+            ready: {
+              on: {
+                BUFFER_LOW: { target: 'buffering', assign: 'startBuffering' },
+              },
+            },
+            buffering: {
+              on: {
+                BUFFER_COMPLETE: { target: 'ready', assign: 'finishBuffering' },
+              },
+            },
+          },
+        },
+        
+        // Network status
+        network: {
+          initial: 'connected',
+          states: {
+            connected: {
+              on: {
+                CONNECTION_LOST: { target: 'disconnected', assign: 'networkDegraded' },
+              },
+            },
+            disconnected: {
+              on: {
+                CONNECTION_RESTORED: { target: 'connected', assign: 'networkRestored' },
+              },
+            },
+          },
+        },
+        
+        // Subtitle control
+        subtitles: {
+          initial: 'hidden',
+          states: {
+            hidden: {
+              on: {
+                SHOW_SUBTITLES: { target: 'visible', assign: 'enableSubtitles' },
+              },
+            },
+            visible: {
+              on: {
+                HIDE_SUBTITLES: { target: 'hidden', assign: 'disableSubtitles' },
+              },
+            },
+          },
+        },
+        
+        // Quality control
+        quality: {
+          initial: 'hd',
+          states: {
+            sd: {
+              on: {
+                SET_HD: { target: 'hd', assign: 'setHD' },
+                SET_4K: { target: 'uhd', assign: 'set4K' },
+              },
+            },
+            hd: {
+              on: {
+                SET_SD: { target: 'sd', assign: 'setSD' },
+                SET_4K: { target: 'uhd', assign: 'set4K' },
+              },
+            },
+            uhd: {
+              on: {
+                SET_SD: { target: 'sd', assign: 'setSD' },
+                SET_HD: { target: 'hd', assign: 'setHD' },
               },
             },
           },

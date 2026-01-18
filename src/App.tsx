@@ -14,8 +14,8 @@ type Tab = 'controls' | 'editor' | 'diagram';
 
 function App() {
   const { theme, toggleTheme } = useTheme();
-  const [code, setCode] = useState(examples.counter);
-  const [loadedCode, setLoadedCode] = useState(examples.counter); // Track what's currently loaded
+  const [code, setCode] = useState(examples.trafficLight);
+  const [loadedCode, setLoadedCode] = useState(examples.trafficLight); // Track what's currently loaded
   const [machine, setMachine] = useState<StateMachine<any, any> | null>(null);
   const [config, setConfig] = useState<StateMachineConfig<any, any> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,18 +30,18 @@ function App() {
   // Check if there are unsaved changes
   const hasUnsavedChanges = code !== loadedCode;
 
-  // Auto-load counter example on first mount
+  // Auto-load traffic light example on first mount
   useEffect(() => {
     if (!initialized) {
       try {
-        const loadedConfig = eval(examples.counter);
+        const loadedConfig = eval(examples.trafficLight);
         const newMachine = new StateMachine(loadedConfig).start();
         setMachine(newMachine);
         setConfig(loadedConfig);
         setActiveStates(new Set(newMachine.getActiveStateNodes()));
         setInitialized(true);
       } catch (err) {
-        console.error('Failed to auto-load counter example:', err);
+        console.error('Failed to auto-load traffic light example:', err);
       }
     }
   }, [initialized]);
