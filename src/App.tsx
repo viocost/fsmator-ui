@@ -45,10 +45,10 @@ function App() {
   // Extract available events from config
   const availableEvents = useMemo(() => {
     if (!machine) return [];
-    
+
     const events = new Set<string>();
     const config = (machine as any).root;
-    
+
     const extractEvents = (node: any) => {
       if (node._onTransitions) {
         for (const eventType of node._onTransitions.keys()) {
@@ -63,7 +63,7 @@ function App() {
         }
       }
     };
-    
+
     extractEvents(config);
     return Array.from(events);
   }, [machine]);
@@ -73,7 +73,7 @@ function App() {
       // Evaluate the code to get the config
       // Using eval instead of Function constructor to support the wrapped object literal syntax
       const loadedConfig = eval(code);
-      
+
       // Validate config has required fields
       if (!loadedConfig || typeof loadedConfig !== 'object') {
         throw new Error('Configuration must be an object');
@@ -87,7 +87,7 @@ function App() {
       if (!loadedConfig.states) {
         throw new Error('Configuration must have states property');
       }
-      
+
       // Create and start the machine
       const newMachine = new StateMachine(loadedConfig).start();
       setMachine(newMachine);
@@ -113,16 +113,19 @@ function App() {
   const handleSendEvent = useCallback((eventType: string, payload?: any) => {
     if (!machine) return;
 
+
     try {
       const event = payload || { type: eventType };
+
+      console.log('Sending event to machine:', event);
       machine.send(event);
-      
+
       const newSeq = eventSeq + 1;
       const resultingState = {
         value: machine.getStateValue(),
         context: machine.getContext(),
       };
-      
+
       // Add to event log
       setEventLog(prev => [...prev, {
         seq: newSeq,
@@ -132,7 +135,7 @@ function App() {
         resultingState,
       }]);
       setEventSeq(newSeq);
-      
+
       setActiveStates(new Set(machine.getActiveStateNodes()));
       setError(null);
     } catch (err: any) {
@@ -142,7 +145,7 @@ function App() {
 
   const handleRewind = useCallback((steps: number = 1) => {
     if (!machine) return;
-    
+
     try {
       machine.rewind(steps);
       setActiveStates(new Set(machine.getActiveStateNodes()));
@@ -154,7 +157,7 @@ function App() {
 
   const handleForward = useCallback((steps: number = 1) => {
     if (!machine) return;
-    
+
     try {
       machine.ff(steps);
       setActiveStates(new Set(machine.getActiveStateNodes()));
@@ -220,11 +223,11 @@ function App() {
 
   const loadExample = useCallback((exampleKey: keyof typeof examples) => {
     setCode(examples[exampleKey]);
-    
+
     // Auto-load the example immediately
     try {
       const loadedConfig = eval(examples[exampleKey]);
-      
+
       if (!loadedConfig || typeof loadedConfig !== 'object') {
         throw new Error('Configuration must be an object');
       }
@@ -237,7 +240,7 @@ function App() {
       if (!loadedConfig.states) {
         throw new Error('Configuration must have states property');
       }
-      
+
       const newMachine = new StateMachine(loadedConfig).start();
       setMachine(newMachine);
       setConfig(loadedConfig);
@@ -269,7 +272,7 @@ function App() {
                 Powered by <a href="https://github.com/viocost/fsmator" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline">FSMator 0.2.0</a>
               </p>
             </div>
-            
+
             {/* Theme Selector */}
             <button
               onClick={toggleTheme}
@@ -296,11 +299,10 @@ function App() {
           <div className="flex gap-2 border-b border-slate-300 dark:border-slate-700">
             <button
               onClick={() => setActiveTab('controls')}
-              className={`px-6 py-3 font-semibold transition relative ${
-                activeTab === 'controls'
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+              className={`px-6 py-3 font-semibold transition relative ${activeTab === 'controls'
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
             >
               Controls & State
               {activeTab === 'controls' && (
@@ -309,11 +311,10 @@ function App() {
             </button>
             <button
               onClick={() => setActiveTab('editor')}
-              className={`px-6 py-3 font-semibold transition relative ${
-                activeTab === 'editor'
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+              className={`px-6 py-3 font-semibold transition relative ${activeTab === 'editor'
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
             >
               Code Editor
               {activeTab === 'editor' && (
@@ -323,11 +324,10 @@ function App() {
             <button
               onClick={() => setActiveTab('diagram')}
               disabled={!machine}
-              className={`px-6 py-3 font-semibold transition relative disabled:opacity-50 disabled:cursor-not-allowed ${
-                activeTab === 'diagram'
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+              className={`px-6 py-3 font-semibold transition relative disabled:opacity-50 disabled:cursor-not-allowed ${activeTab === 'diagram'
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
             >
               Interactive Diagram
               {activeTab === 'diagram' && (
@@ -406,7 +406,7 @@ function App() {
                     </div>
                   </div>
 
-                  <StateDisplay 
+                  <StateDisplay
                     stateValue={machine.getStateValue()}
                     context={machine.getContext()}
                     isHalted={machine.isHalted()}
@@ -437,7 +437,7 @@ function App() {
         {activeTab === 'editor' && (
           <div className="space-y-6">
             <CodeEditor value={code} onChange={setCode} onLoadExample={loadExample} />
-            
+
             <div className="flex gap-3">
               <button
                 onClick={loadConfiguration}

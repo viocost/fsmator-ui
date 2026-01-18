@@ -81,9 +81,12 @@ export const examples = {
       errors: event.payload?.errors || ['Validation failed']
     }),
     clearErrors: () => ({ errors: [] }),
-    updateForm: ({ context, event }) => ({
-      formData: { ...context.formData, ...event.payload }
-    }),
+    updateForm: ({ context, event }) => {
+      console.log('Updating form with:', event.payload);
+      return {
+        formData: { ...context.formData, ...event.payload }
+      }
+   },
   },
   
   states: {

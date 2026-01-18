@@ -37,8 +37,8 @@ interface StateMachineDiagramProps {
 
 type ModalMode = 'payload' | 'custom';
 
-export default function StateMachineDiagram({ 
-  config, 
+export default function StateMachineDiagram({
+  config,
   activeStates,
   context,
   eventLog,
@@ -288,6 +288,7 @@ export default function StateMachineDiagram({
 
     // Add interactivity
     cyRef.current.on('tap', 'edge', (evt) => {
+      console.log('Edge clicked');
       const edge = evt.target;
       const edgeData = edge.data();
 
@@ -387,11 +388,11 @@ export default function StateMachineDiagram({
     if (!cyRef.current) return;
 
     const elements = buildElements(config);
-    
+
     // Replace elements
     cyRef.current.elements().remove();
     cyRef.current.add(elements);
-    
+
     // Re-run layout
     cyRef.current.layout({
       name: 'dagre',
@@ -407,7 +408,7 @@ export default function StateMachineDiagram({
   // Update theme styles when theme changes
   useEffect(() => {
     if (!cyRef.current) return;
-    
+
     const isDark = theme === 'dark';
     cyRef.current.style(getStylesheet(isDark));
   }, [theme]);
@@ -468,7 +469,8 @@ export default function StateMachineDiagram({
   };
 
   const handleSendEvent = (eventType: string, payload?: any) => {
-    onEventClick(eventType, payload);
+    console.log(`Sending event: ${eventType}`, payload);
+    onEventClickRef.current(eventType, payload);
     // Show toast notification
     const payloadText = payload && Object.keys(payload).length > 0
       ? ` with payload`
@@ -675,13 +677,12 @@ export default function StateMachineDiagram({
 
         {/* Diagram container wrapper with relative positioning */}
         <div className="relative">
-          <div 
-            ref={containerRef} 
-            className={`bg-white dark:bg-slate-900 rounded border-2 border-slate-300 dark:border-slate-700 ${
-              isFullscreen ? 'h-[calc(100vh-6rem)] flex-1' : 'h-[600px]'
-            }`}
+          <div
+            ref={containerRef}
+            className={`bg-white dark:bg-slate-900 rounded border-2 border-slate-300 dark:border-slate-700 ${isFullscreen ? 'h-[calc(100vh-6rem)] flex-1' : 'h-[600px]'
+              }`}
           />
-          
+
           {/* Context Overlay - positioned over the diagram (right side) */}
           {showContextOverlay ? (
             <div className="absolute top-4 right-4 z-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-w-sm max-h-[calc(100%-2rem)] overflow-hidden flex flex-col pointer-events-auto">
@@ -755,26 +756,24 @@ export default function StateMachineDiagram({
                       // historyIndex 1 = after first event (event index 0)
                       // So current event is historyIndex - 1
                       const isCurrentEvent = index === historyIndex - 1;
-                      
+
                       return (
                         <div
                           key={index}
-                          className={`rounded border overflow-hidden ${
-                            isCurrentEvent 
-                              ? 'bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-600 ring-2 ring-green-500 dark:ring-green-600' 
-                              : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700'
-                          }`}
+                          className={`rounded border overflow-hidden ${isCurrentEvent
+                            ? 'bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-600 ring-2 ring-green-500 dark:ring-green-600'
+                            : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700'
+                            }`}
                         >
                           <button
                             onClick={() => setExpandedEventIndex(expandedEventIndex === index ? null : index)}
                             className="w-full px-2 py-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left"
                           >
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <span className={`font-mono text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${
-                                isCurrentEvent
-                                  ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
-                                  : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                              }`}>
+                              <span className={`font-mono text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${isCurrentEvent
+                                ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
+                                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                                }`}>
                                 #{event.seq}
                               </span>
                               <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
@@ -797,10 +796,10 @@ export default function StateMachineDiagram({
                                   <p className="text-xs font-mono text-slate-800 dark:text-slate-200">
                                     {(() => {
                                       const date = new Date(event.timestamp);
-                                      return date.toLocaleTimeString('en-US', { 
-                                        hour12: false, 
-                                        hour: '2-digit', 
-                                        minute: '2-digit', 
+                                      return date.toLocaleTimeString('en-US', {
+                                        hour12: false,
+                                        hour: '2-digit',
+                                        minute: '2-digit',
                                         second: '2-digit'
                                       }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
                                     })()}
@@ -952,6 +951,7 @@ function buildElements(config: StateMachineConfig<any, any>) {
           id: `start_to_${fullStateId}`,
           source: startNodeId,
           target: fullStateId,
+          label: '', // Empty label to avoid mapping warnings
           isStartEdge: true,
         },
       });
@@ -959,8 +959,8 @@ function buildElements(config: StateMachineConfig<any, any>) {
 
     // Process 'always' transitions (automatic transitions)
     if (stateConfig.always) {
-      const alwaysTransitions = Array.isArray(stateConfig.always) 
-        ? stateConfig.always 
+      const alwaysTransitions = Array.isArray(stateConfig.always)
+        ? stateConfig.always
         : [stateConfig.always];
 
       alwaysTransitions.forEach((transition, index) => {
@@ -973,12 +973,12 @@ function buildElements(config: StateMachineConfig<any, any>) {
 
           // Only create edge if target exists
           if (stateRegistry.has(fullTargetId)) {
-            const guards = transitionConfig.guard 
-              ? Array.isArray(transitionConfig.guard) 
-                ? transitionConfig.guard 
+            const guards = transitionConfig.guard
+              ? Array.isArray(transitionConfig.guard)
+                ? transitionConfig.guard
                 : [transitionConfig.guard]
               : [];
-            
+
             const guardLabel = guards.length > 0 ? ` [🛡 ${guards.join(', ')}]` : '';
             const label = `always${guardLabel}`;
 
@@ -1015,12 +1015,12 @@ function buildElements(config: StateMachineConfig<any, any>) {
 
               // Only create edge if target exists
               if (stateRegistry.has(fullTargetId)) {
-                const guards = transitionConfig.guard 
-                  ? Array.isArray(transitionConfig.guard) 
-                    ? transitionConfig.guard 
+                const guards = transitionConfig.guard
+                  ? Array.isArray(transitionConfig.guard)
+                    ? transitionConfig.guard
                     : [transitionConfig.guard]
                   : [];
-                
+
                 const guardLabel = guards.length > 0 ? ` [🛡 ${guards.join(', ')}]` : '';
                 const label = `${eventType}${guardLabel}`;
 
