@@ -119,7 +119,7 @@ export default function PayloadModal({ isOpen, eventType, mode, onSend, onClose 
   const lines = payloadText.split('\n');
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={onClose}>
+    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-[200]" onClick={onClose}>
       <div 
         className="bg-white dark:bg-slate-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 border-2 border-slate-300 dark:border-slate-600"
         onClick={(e) => e.stopPropagation()}

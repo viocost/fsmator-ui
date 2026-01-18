@@ -509,19 +509,19 @@ export default function StateMachineDiagram({
 
   return (
     <>
-      <PayloadModal
-        isOpen={modalOpen}
-        eventType={selectedEventType}
-        mode={modalMode}
-        onSend={handleSendEvent}
-        onClose={handleCloseModal}
-      />
-
       <div
         ref={wrapperRef}
-        className={`bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl p-4 ${isFullscreen ? 'bg-white dark:bg-slate-950' : ''
+        className={`relative bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl p-4 ${isFullscreen ? 'bg-white dark:bg-slate-950' : ''
           }`}
       >
+        {/* PayloadModal - needs to be inside wrapper for fullscreen visibility */}
+        <PayloadModal
+          isOpen={modalOpen}
+          eventType={selectedEventType}
+          mode={modalMode}
+          onSend={handleSendEvent}
+          onClose={handleCloseModal}
+        />
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">State Machine Diagram</h2>
