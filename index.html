@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <title>State Machine Simulator</title>
+    <script>
+      // Prevent flash of unstyled content by applying theme class immediately
+      (function() {
+        const theme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <script type="module" crossorigin src="/fsmator/assets/index-vmKqKxg8.js"></script>
+    <link rel="stylesheet" crossorigin href="/fsmator/assets/index-CJeGrC-O.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
