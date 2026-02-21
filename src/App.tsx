@@ -1,29 +1,34 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { StateMachine, type StateMachineConfig } from 'fsmator';
-import StateMachineDiagram from '@/components/StateMachineDiagram';
-import CodeEditor from '@/components/CodeEditor';
-import StateDisplay from '@/components/StateDisplay';
-import EventControls from '@/components/EventControls';
-import EventLog, { type EventLogEntry } from '@/components/EventLog';
-import Toast from '@/components/Toast';
-import Footer from '@/components/Footer';
-import { examples } from '@/examples';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { StateMachine, type StateMachineConfig } from "fsmator";
+import StateMachineDiagram from "@/components/StateMachineDiagram";
+import CodeEditor from "@/components/CodeEditor";
+import StateDisplay from "@/components/StateDisplay";
+import EventControls from "@/components/EventControls";
+import EventLog, { type EventLogEntry } from "@/components/EventLog";
+import Toast from "@/components/Toast";
+import Footer from "@/components/Footer";
+import { examples } from "@/examples";
+import { useTheme } from "@/contexts/ThemeContext";
 
-type Tab = 'controls' | 'editor' | 'diagram';
+type Tab = "controls" | "editor" | "diagram";
 
 function App() {
   const { theme, toggleTheme } = useTheme();
   const [code, setCode] = useState(examples.trafficLight);
   const [loadedCode, setLoadedCode] = useState(examples.trafficLight); // Track what's currently loaded
   const [machine, setMachine] = useState<StateMachine<any, any> | null>(null);
-  const [config, setConfig] = useState<StateMachineConfig<any, any> | null>(null);
+  const [config, setConfig] = useState<StateMachineConfig<any, any> | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [activeStates, setActiveStates] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<Tab>('controls');
+  const [activeTab, setActiveTab] = useState<Tab>("controls");
   const [eventLog, setEventLog] = useState<EventLogEntry[]>([]);
   const [eventSeq, setEventSeq] = useState(0);
-  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'warning' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "info" | "success" | "warning" | "error";
+  } | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -41,7 +46,7 @@ function App() {
         setActiveStates(new Set(newMachine.getActiveStateNodes()));
         setInitialized(true);
       } catch (err) {
-        console.error('Failed to auto-load traffic light example:', err);
+        console.error("Failed to auto-load traffic light example:", err);
       }
     }
   }, [initialized]);
@@ -56,7 +61,7 @@ function App() {
     const extractEvents = (node: any) => {
       if (node._onTransitions) {
         for (const eventType of node._onTransitions.keys()) {
-          if (!eventType.startsWith('__')) {
+          if (!eventType.startsWith("__")) {
             events.add(eventType);
           }
         }
@@ -77,21 +82,21 @@ function App() {
       // Evaluate the code to get the config
       // Using eval instead of Function constructor to support the wrapped object literal syntax
       const loadedConfig = eval(code);
-      
+
       // Validate config has required fields
-      if (!loadedConfig || typeof loadedConfig !== 'object') {
-        throw new Error('Configuration must be an object');
+      if (!loadedConfig || typeof loadedConfig !== "object") {
+        throw new Error("Configuration must be an object");
       }
       if (!loadedConfig.initialContext) {
-        throw new Error('Configuration must have initialContext property');
+        throw new Error("Configuration must have initialContext property");
       }
       if (!loadedConfig.initial) {
-        throw new Error('Configuration must have initial property');
+        throw new Error("Configuration must have initial property");
       }
       if (!loadedConfig.states) {
-        throw new Error('Configuration must have states property');
+        throw new Error("Configuration must have states property");
       }
-      
+
       // Create and start the machine
       const newMachine = new StateMachine(loadedConfig).start();
       setMachine(newMachine);
@@ -101,9 +106,12 @@ function App() {
       setEventLog([]);
       setEventSeq(0);
       setLoadedCode(code); // Mark current code as loaded
-      setToast({ message: 'Configuration applied successfully', type: 'success' });
+      setToast({
+        message: "Configuration applied successfully",
+        type: "success",
+      });
     } catch (err: any) {
-      setError(err.message || 'Failed to load configuration');
+      setError(err.message || "Failed to load configuration");
       setMachine(null);
       setConfig(null);
     }
@@ -112,87 +120,102 @@ function App() {
   // Detect when machine halts and show toast
   useEffect(() => {
     if (machine && machine.isHalted()) {
-      setToast({ message: 'State Machine Halted', type: 'warning' });
+      setToast({ message: "State Machine Halted", type: "warning" });
     }
   }, [machine, activeStates]);
 
-  const handleSendEvent = useCallback((eventType: string, payload?: any) => {
-    if (!machine) return;
+  const handleSendEvent = useCallback(
+    (eventType: string, payload?: any) => {
+      if (!machine) return;
 
-    try {
-      const event = payload || { type: eventType };
-      
-      console.log('Sending event to machine:', event);
-      
-      // Check if we're in the middle of history
-      const currentIndex = machine.getHistoryIndex();
-      const maxIndex = machine.getHistoryLength() - 1;
-      const isInMiddleOfHistory = currentIndex < maxIndex;
-      
-      machine.send(event);
-      
-      const newSeq = eventSeq + 1;
-      const resultingState = {
-        value: machine.getStateValue(),
-        context: machine.getContext(),
-      };
-      
-      // If we're in the middle of history, truncate the log to current position
-      // then add the new event
-      setEventLog(prev => {
-        if (isInMiddleOfHistory) {
-          // Truncate to current position (currentIndex is 0-based, eventLog uses 1-based seq)
-          const truncated = prev.slice(0, currentIndex);
-          return [...truncated, {
-            seq: newSeq,
-            type: eventType,
-            payload: event,
-            timestamp: Date.now(),
-            resultingState,
-          }];
-        } else {
-          // Normal append at the end
-          return [...prev, {
-            seq: newSeq,
-            type: eventType,
-            payload: event,
-            timestamp: Date.now(),
-            resultingState,
-          }];
-        }
-      });
-      setEventSeq(newSeq);
-      
-      setActiveStates(new Set(machine.getActiveStateNodes()));
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to send event');
-    }
-  }, [machine, eventSeq]);
+      try {
+        const event = payload || { type: eventType };
 
-  const handleRewind = useCallback((steps: number = 1) => {
-    if (!machine) return;
+        console.log("Sending event to machine:", event);
 
-    try {
-      machine.rewind(steps);
-      setActiveStates(new Set(machine.getActiveStateNodes()));
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to rewind');
-    }
-  }, [machine]);
+        // Check if we're in the middle of history
+        const currentIndex = machine.getHistoryIndex();
+        const maxIndex = machine.getHistoryLength() - 1;
+        const isInMiddleOfHistory = currentIndex < maxIndex;
 
-  const handleForward = useCallback((steps: number = 1) => {
-    if (!machine) return;
+        machine.handle(event);
 
-    try {
-      machine.ff(steps);
-      setActiveStates(new Set(machine.getActiveStateNodes()));
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fast-forward');
-    }
-  }, [machine]);
+        const newSeq = eventSeq + 1;
+        const resultingState = {
+          value: machine.getStateValue(),
+          context: machine.getContext(),
+        };
+
+        // If we're in the middle of history, truncate the log to current position
+        // then add the new event
+        setEventLog((prev) => {
+          if (isInMiddleOfHistory) {
+            // Truncate to current position (currentIndex is 0-based, eventLog uses 1-based seq)
+            const truncated = prev.slice(0, currentIndex);
+            return [
+              ...truncated,
+              {
+                seq: newSeq,
+                type: eventType,
+                payload: event,
+                timestamp: Date.now(),
+                resultingState,
+              },
+            ];
+          } else {
+            // Normal append at the end
+            return [
+              ...prev,
+              {
+                seq: newSeq,
+                type: eventType,
+                payload: event,
+                timestamp: Date.now(),
+                resultingState,
+              },
+            ];
+          }
+        });
+        setEventSeq(newSeq);
+
+        setActiveStates(new Set(machine.getActiveStateNodes()));
+        setError(null);
+      } catch (err: any) {
+        setError(err.message || "Failed to send event");
+      }
+    },
+    [machine, eventSeq],
+  );
+
+  const handleRewind = useCallback(
+    (steps: number = 1) => {
+      if (!machine) return;
+
+      try {
+        machine.rewind(steps);
+        setActiveStates(new Set(machine.getActiveStateNodes()));
+        setError(null);
+      } catch (err: any) {
+        setError(err.message || "Failed to rewind");
+      }
+    },
+    [machine],
+  );
+
+  const handleForward = useCallback(
+    (steps: number = 1) => {
+      if (!machine) return;
+
+      try {
+        machine.ff(steps);
+        setActiveStates(new Set(machine.getActiveStateNodes()));
+        setError(null);
+      } catch (err: any) {
+        setError(err.message || "Failed to fast-forward");
+      }
+    },
+    [machine],
+  );
 
   const handleFullRewind = useCallback(() => {
     if (!machine) return;
@@ -236,7 +259,9 @@ function App() {
   }, [isPlaying, machine, handleForward]);
 
   const canRewind = machine ? machine.getHistoryIndex() > 0 : false;
-  const canForward = machine ? machine.getHistoryIndex() < machine.getHistoryLength() - 1 : false;
+  const canForward = machine
+    ? machine.getHistoryIndex() < machine.getHistoryLength() - 1
+    : false;
 
   const handleReset = useCallback(() => {
     setIsPlaying(false);
@@ -250,24 +275,24 @@ function App() {
 
   const loadExample = useCallback((exampleKey: keyof typeof examples) => {
     setCode(examples[exampleKey]);
-    
+
     // Auto-load the example immediately
     try {
       const loadedConfig = eval(examples[exampleKey]);
-      
-      if (!loadedConfig || typeof loadedConfig !== 'object') {
-        throw new Error('Configuration must be an object');
+
+      if (!loadedConfig || typeof loadedConfig !== "object") {
+        throw new Error("Configuration must be an object");
       }
       if (!loadedConfig.initialContext) {
-        throw new Error('Configuration must have initialContext property');
+        throw new Error("Configuration must have initialContext property");
       }
       if (!loadedConfig.initial) {
-        throw new Error('Configuration must have initial property');
+        throw new Error("Configuration must have initial property");
       }
       if (!loadedConfig.states) {
-        throw new Error('Configuration must have states property');
+        throw new Error("Configuration must have states property");
       }
-      
+
       const newMachine = new StateMachine(loadedConfig).start();
       setMachine(newMachine);
       setConfig(loadedConfig);
@@ -277,7 +302,7 @@ function App() {
       setEventSeq(0);
       setLoadedCode(examples[exampleKey]); // Mark example as loaded
     } catch (err: any) {
-      setError(err.message || 'Failed to load configuration');
+      setError(err.message || "Failed to load configuration");
       setMachine(null);
       setConfig(null);
     }
@@ -297,7 +322,15 @@ function App() {
                 Visual State Machine Simulator
               </p>
               <p className="text-slate-600 dark:text-slate-400 text-xs mt-1">
-                Powered by <a href="https://github.com/viocost/fsmator" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline">FSMator 0.2.0</a>
+                Powered by{" "}
+                <a
+                  href="https://github.com/viocost/fsmator"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                >
+                  FSMator 0.2.0
+                </a>
               </p>
             </div>
 
@@ -305,9 +338,9 @@ function App() {
             <button
               onClick={toggleTheme}
               className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg transition shadow-md"
-              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
             >
-              {theme === 'dark' ? '☀️' : '🌙'}
+              {theme === "dark" ? "☀️" : "🌙"}
             </button>
           </div>
         </div>
@@ -317,8 +350,12 @@ function App() {
         {/* Error Display */}
         {error && (
           <div className="mb-6 bg-red-100 dark:bg-red-500/20 border-2 border-red-500 rounded-lg p-4">
-            <h3 className="text-red-600 dark:text-red-400 font-bold mb-1">Error</h3>
-            <pre className="text-red-700 dark:text-red-300 text-sm font-mono">{error}</pre>
+            <h3 className="text-red-600 dark:text-red-400 font-bold mb-1">
+              Error
+            </h3>
+            <pre className="text-red-700 dark:text-red-300 text-sm font-mono">
+              {error}
+            </pre>
           </div>
         )}
 
@@ -326,39 +363,42 @@ function App() {
         <div className="mb-6">
           <div className="flex gap-2 border-b border-slate-300 dark:border-slate-700">
             <button
-              onClick={() => setActiveTab('controls')}
-              className={`px-6 py-3 font-semibold transition relative ${activeTab === 'controls'
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
+              onClick={() => setActiveTab("controls")}
+              className={`px-6 py-3 font-semibold transition relative ${
+                activeTab === "controls"
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+              }`}
             >
               Controls & State
-              {activeTab === 'controls' && (
+              {activeTab === "controls" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
               )}
             </button>
             <button
-              onClick={() => setActiveTab('editor')}
-              className={`px-6 py-3 font-semibold transition relative ${activeTab === 'editor'
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
+              onClick={() => setActiveTab("editor")}
+              className={`px-6 py-3 font-semibold transition relative ${
+                activeTab === "editor"
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+              }`}
             >
               Code Editor
-              {activeTab === 'editor' && (
+              {activeTab === "editor" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
               )}
             </button>
             <button
-              onClick={() => setActiveTab('diagram')}
+              onClick={() => setActiveTab("diagram")}
               disabled={!machine}
-              className={`px-6 py-3 font-semibold transition relative disabled:opacity-50 disabled:cursor-not-allowed ${activeTab === 'diagram'
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
+              className={`px-6 py-3 font-semibold transition relative disabled:opacity-50 disabled:cursor-not-allowed ${
+                activeTab === "diagram"
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+              }`}
             >
               Interactive Diagram
-              {activeTab === 'diagram' && (
+              {activeTab === "diagram" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
               )}
             </button>
@@ -366,7 +406,7 @@ function App() {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'controls' && (
+        {activeTab === "controls" && (
           <div className="grid grid-cols-2 gap-6">
             {/* Left Column - State & Controls */}
             <div className="space-y-6">
@@ -375,9 +415,12 @@ function App() {
                   {/* Time Controls */}
                   <div className="bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Time Travel</h3>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                        Time Travel
+                      </h3>
                       <div className="text-sm text-slate-600 dark:text-slate-400 font-mono">
-                        {machine.getHistoryIndex() + 1} / {machine.getHistoryLength()}
+                        {machine.getHistoryIndex() + 1} /{" "}
+                        {machine.getHistoryLength()}
                       </div>
                     </div>
                     <div className="flex gap-2 flex-wrap">
@@ -462,16 +505,16 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'editor' && (
+        {activeTab === "editor" && (
           <div className="space-y-6">
-            <CodeEditor 
-              value={code} 
-              onChange={setCode} 
+            <CodeEditor
+              value={code}
+              onChange={setCode}
               onApply={loadConfiguration}
               hasUnsavedChanges={hasUnsavedChanges}
-              onLoadExample={loadExample} 
+              onLoadExample={loadExample}
             />
-            
+
             <div className="flex gap-3">
               <button
                 onClick={handleReset}
@@ -484,7 +527,7 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'diagram' && machine && config && (
+        {activeTab === "diagram" && machine && config && (
           <StateMachineDiagram
             config={config}
             activeStates={activeStates}
