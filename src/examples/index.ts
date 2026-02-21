@@ -5,7 +5,7 @@ export const examples = {
   initial: 'active',
   timeTravel: true,
   
-  reducers: {
+  assigns: {
     increment: ({ context }) => {
       return { count: context.count + 1 };
     },
@@ -37,7 +37,7 @@ export const examples = {
   initial: 'green',
   timeTravel: true,
   
-  reducers: {
+  assigns: {
     incrementCycle: ({ context }) => {
       return { 
         cycleCount: context.cycleCount + 1,
@@ -81,7 +81,7 @@ export const examples = {
       context.formData.email.includes('@'),
   },
   
-  reducers: {
+  assigns: {
     incrementAttempts: ({ context }) => {
       return { 
         submitAttempts: context.submitAttempts + 1 
@@ -159,7 +159,7 @@ export const examples = {
   initial: 'off',
   timeTravel: true,
   
-  reducers: {
+  assigns: {
     powerOn: () => {
       return { 
         isPoweredOn: true,
