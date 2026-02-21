@@ -329,7 +329,7 @@ function App() {
                   rel="noopener noreferrer"
                   className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline"
                 >
-                  FSMator 0.2.0
+                  FSMator 1.0.0
                 </a>
               </p>
             </div>
